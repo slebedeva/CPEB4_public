@@ -7,12 +7,14 @@ setwd(basedir)
 plotdir <- file.path(basedir,"plots")
 if(! dir.exists(plotdir)){dir.create(plotdir)}
 
-## additional funcitons
-source("CLIP.Rprofile")
-
 ## library path
 # for containers
 .libPaths("CLIP_Rlibs") ## local path depends on mountpoint inside container!
+
+
+## additional funcitons
+source("CLIP.Rprofile")
+
 
 ###################################################### load environment ########################################################################################
 
@@ -58,7 +60,7 @@ suppressPackageStartupMessages(lapply(mypackages, require, character.only=T))
 mycuts=c(0,1,10,100,1000,5000)
 
 ## get genome sequence (only once)
-if(!file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|file.exists("GRCh37.p13.genome.fa.bgz")){
+if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|file.exists("GRCh37.p13.genome.fa.bgz"))){
   system("wget http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/GRCh37.p13.genome.fa.gz")
   system("gunzip -c GRCh37.p13.genome.fa.gz | bgzip  > GRCh37.p13.genome.fa.bgz")
   }
@@ -67,19 +69,33 @@ hg19=("GRCh37.p13.genome.fa.bgz")
 ## annotation
 load("data/gtf.RData")
 
-## transcript reigons
+## transcript regions
 load("data/myregions.RData")
+
+## make reduced utrs 
+ncbi_utrs <- rtracklayer::import("ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
+red_utrs <- GenomicRanges::reduce(ncbi_utrs,with.revmap=T) ##names needed for mapToTx
+canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
+red_utrs <- red_utrs%>%subset(., .@seqnames%in%canonical_chr)
+red_utrs$name <- ncbi_utrs$name[unlist(lapply(red_utrs$revmap, function(x) return(x[[1]])))]
+names(red_utrs) <- red_utrs$name
+
 
 ## merged CLIP peaks
 load("data/bed_reduced.RData") ## these peaks are reduced (overlapping peak calls are merged)
 load("data/reduced_beds_for_igv.RData") ## these peaks have transcript regions assigned
+
+## import target genes
+load("data/csv.RData")
 
 ## differential expresison
 load("DEseq.RData") 
 
 
 ## bam file list
-allbams <- list.files("data/bams")
+allbams <- list.files("data/bams", pattern = ".bam$", full.names = T)
+## index bam (only once)
+if(!file.exists("data/bams/RMD2_CLIP.merged_uniq.bam.bai")){lapply(allbams,function(x) Rsamtools::indexBam(x))}
 
 ### get ARE and IEG gene databases
 
@@ -93,17 +109,43 @@ AREdb=rio::import('Complete 3 UTR Data.xls')
 ## add fantom IEG 
 fantom_ieg=rio::import("https://ndownloader.figshare.com/files/3263948", skip=1)%>%dplyr::slice(1:232)
 
-##clean up
-system("rm wget-log")
+##clean up 
+if(file.exists("wget-log")){system("rm wget-log")}
 
 
 ########### Figures ################
 
 ########### Fig 4 ##########
 
-## B: pie charts transcript categories for sites > 10 DEs
+############ 4B: pie charts transcript categories for sites > 10 DEs #####################
 
+## same color scheme everywhere - put all shared into "multiple" category otherwise too many colors!
+ctrl2$tx_region <- ifelse(!grepl("_",ctrl2$region),ctrl2$region,
+                          ifelse(grepl("3'UTR",ctrl2$region),"3UTR or other","multiple non-3'UTR"))
+rmd2$tx_region <- ifelse(!grepl("_",rmd2$region),rmd2$region,
+                         ifelse(grepl("3'UTR",rmd2$region),"3UTR or other","multiple non-3'UTR"))
+allreg <- levels(factor(c(ctrl2$tx_region,rmd2$tx_region)))
+myCol <- rev(RColorBrewer::brewer.pal(n = length(allreg), "BrBG"))
+names(myCol) <- allreg
 
+ctrl2$target_group %<>% gsub("5000-38127","5000-more", .)
+rmd2$target_group %<>% gsub("5000-9399","5000-more",.)
+
+## only show pie chart for >10 DEs
+mypiec <- mcols(ctrl2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%c("0","1-10"))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="DMSO")
+mypier <- mcols(rmd2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%c("0","1-10"))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="RMD")
+mypie <- rbind(mypiec,mypier)
+ppie <-
+  ggplot(mypie, aes(x="", y=perc, fill=tx_region))+
+  geom_bar(stat="identity", color="grey") +
+  coord_polar(theta = "y", direction = 1, start=0)+
+  theme_void(base_size=global_size)+
+  scale_fill_manual(values = myCol, name = "sites with > 10 DEs")+
+  facet_wrap(~condition,dir="v")+
+  NULL
+ppie
+
+write_csv(mypie, file = "data/source_data/Fig_4B.csv")
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 
@@ -142,13 +184,6 @@ write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
 
 ### calculate background: what is kmer count in all UTRs?
 ## use reduced UTRs to avoid double counting same sequence
-## make red utrs 
-ncbi_utrs <- rtracklayer::import("ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
-red_utrs <- GenomicRanges::reduce(ncbi_utrs,with.revmap=T) ##names needed for mapToTx
-canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
-red_utrs <- red_utrs%>%subset(., .@seqnames%in%canonical_chr)
-red_utrs$name <- ncbi_utrs$name[unlist(lapply(red_utrs$revmap, function(x) return(x[[1]])))]
-names(red_utrs) <- red_utrs$name
 
 ##
 myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
@@ -389,16 +424,220 @@ mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file="data/source_data/Fi
 
 ########### Fig 5 ##########
 
-## A: violin plots for half-lives
+### import raw half lives and connect to target gene names and groups
 
-## D: ecdf for IEGs
+## import raw half lives, remove ERCCs
+hlraw <- read.csv("data/hl_norm_to_ERCC92.csv"
+                  , stringsAsFactors = F)%>%
+  dplyr::select(X,ends_with("_hl"),ends_with("_R2"))%>%
+  dplyr::filter(!grepl("^ERCC-",.$X))
+## add diagnostic events and target groups
+hlraw$DEs <- csv$sumDEPerGene[match(hlraw$X,csv$gene_names)]
+hlraw$target_group <- Hmisc::cut2(x = hlraw$DEs,cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("46027\\]","more",.)%>%gsub("\\,","\\-",.)%>%forcats::fct_explicit_na(., "nontarget")
+## add ARE
+hlraw$ARE <- ifelse(hlraw$X%in%AREdb$GeneName, "ARE", "non-ARE")
+## add IEG
+hlraw$IEG <- ifelse(hlraw$X%in%fantom_ieg$Hs_symbol, "IEG", "non-IEG")
 
-## E: ecdf for target groups
+### calculate average log FC as average between 2 siRNAs and 2 controls (as Fabian did for thesis)
+fab_half <- hlraw%>%
+  filter_at(vars(ends_with("_R2")), all_vars(.>=0.5))%>%
+  filter_at(vars(ends_with("_hl")), all_vars(.>=0))%>%
+  mutate(mean_siCPEB4_DMSO=rowMeans(dplyr::select(., condHeLa_S140_DMSO_rep1_hl, condHeLa_S181_DMSO_rep1_hl)),
+         mean_siCPEB4_RMD=rowMeans(dplyr::select(., condHeLa_S140_RMD_rep1_hl, condHeLa_S181_RMD_rep1_hl)),
+         mean_Ctrl_DMSO=rowMeans(dplyr::select(., condHeLa_C2_DMSO_rep1_hl, condHeLa_DMSO_rep1_hl)),
+         mean_Ctrl_RMD=rowMeans(dplyr::select(., condHeLa_C2_RMD_rep1_hl, condHeLa_RMD_rep1_hl)),
+         meanlogFC_DMSO=log2(mean_siCPEB4_DMSO/mean_Ctrl_DMSO),
+         meanlogFC_RMD=log2(mean_siCPEB4_RMD/mean_Ctrl_RMD))%>%
+  mutate(across(.cols = starts_with("mean_"),.fns = list(log2=log2)))%>% ##for scatterplot need log2
+  mutate(stabilized_DMSO=ifelse(IEG=="IEG" & meanlogFC_DMSO>log2(1.8),"IEG > 1.8x stabilized",
+                                ifelse(IEG=="IEG" & meanlogFC_DMSO<=log2(1.8), "other IEG","non-IEG")))%>% ##need for highlighting IEG
+  mutate(stabilized_RMD=ifelse(IEG=="IEG" & meanlogFC_RMD>log2(1.5),"IEG > 1.5x stabilized",
+                               ifelse(IEG=="IEG" & meanlogFC_RMD<=log2(1.5), "other IEG","non-IEG"))) ##need for highlighting IEG
 
-## F: GSEA plot
+### source data
 
-## G: example genome browser shots
+write_csv(fab_half, file="data/source_data/Fig_5DE_S7C.csv")
 
+##################### 5A: violin plots for half-lives ###################
+
+## split violin plot with only DMSO and RMD 
+## select only DMSO and RMD raw condition and filter for positive hl/ R2>0.5  
+hl2 <- hlraw%>%dplyr::select(X,target_group,IEG, ARE,
+                             condHeLa_DMSO_rep1_hl,condHeLa_RMD_rep1_hl,
+                             condHeLa_DMSO_rep1_R2,condHeLa_RMD_rep1_R2)%>%
+  filter_at(vars(ends_with("_R2")), all_vars(.>0.5))%>%
+  filter_at(vars(ends_with("_hl")), all_vars(.>0))%>%
+  dplyr::select(X,ends_with("_hl"),target_group,ARE,IEG)%>%
+  reshape2::melt(.)
+hl2$target_group %<>% relevel(., ref = "nontarget") 
+phl <- 
+  ggplot(hl2, aes(target_group, log2(value),fill=variable)) +
+  geom_split_violin(scale = "width", trim=F) + 
+  scale_fill_brewer(type = "div", direction = -1, labels=c("DMSO","RMD")) +
+  labs(y=expression("RNA "*tau[1/2]*" (log"[2]*")"), x="diagnostic events") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle=90),
+        legend.title = element_blank()) +
+  geom_boxplot(width=0.15, outlier.shape = NA, coef=0) +
+  #geom_point(shape=21, aes(fill=variable), color="black", stroke=.5, position=position_jitterdodge(dodge.width = 1.7, jitter.width = .1), alpha=1) + ##https://stackoverflow.com/a/24019668 ## use point because geom_jitter doesn't know fill aes
+  NULL
+phl
+
+write_csv(hl2, file = "data/source_data/Fig_5A.csv")
+
+##################### 5D: ecdf for IEGs #####################
+
+ggsiIEG <- 
+  ggplot(fab_half, aes(meanlogFC_DMSO, col=IEG)) +
+  stat_ecdf(geom = "step", size=1) +
+  labs(title="", y="",x=expression('RNA '*tau[1/2]*' (log'[2]*' fold change siCPEB4/ctrl)') ) +
+  theme_classic() +
+  theme(legend.position = c(0,1), legend.justification = c(0,1),
+        legend.background = element_rect(fill=alpha("grey",0))) +
+  scale_color_manual(values = my_palette[c(5,7)],
+                     labels=summary(factor(fab_half$IEG))%>%paste(names(.),.,sep=": n=")) +
+  NULL
+ggsiIEG
+
+################### 5E: ecdf for target groups #################
+
+ggsimean <- 
+  ggplot(fab_half, aes(meanlogFC_DMSO, col=target_group)) +
+  stat_ecdf(geom = "step", size=1) +
+  labs(title="", y="",x=expression('RNA '*tau[1/2]*' (log'[2]*' fold change siCPEB4/ctrl)') ) +
+  theme_classic() +
+  theme(legend.position = c(0,1), legend.justification = c(0,1),
+        legend.background = element_rect(fill=alpha("grey",0))) +
+  scale_color_manual(values = my_palette, name="Target group",
+                     labels=summary(factor(fab_half$target_group))%>%paste(names(.),.,sep=": n=")) +
+  NULL
+ggsimean
+
+#################### 5F: GSEA plot ################################
+
+## exclude non ambiguous gene names (when 2 genes share a peak):
+csv_uniq <- csv%>%.[!grepl(";",.$gene_names),] 
+forGsea <- csv_uniq%>%dplyr::select(gene_names,sumDEPerGene)%>%deframe
+## first you need to download the GSEA own database for hallmark genes using gene symbols from here https://www.gsea-msigdb.org/gsea/msigdb/collections.jsp#H (login with email)
+pathways <- gmtPathways("data/h.all.v7.4.symbols.gmt") ## all pathways
+## add IEGs from Fantom paper as custom pathway
+pathways$FANTOM_IEG <- fantom_ieg$Hs_symbol
+set.seed(42)
+fgseaRes <- fgsea(pathways, forGsea, maxSize=500, nperm=10000)
+leadEdge <- fgseaRes[pathway=="FANTOM_IEG"]$leadingEdge
+## modified the original fgsea funciton (change colors)
+plotEnrichment_ <- function(pathway, stats, gseaParam = 1, ticksSize = 0.2) 
+{
+  rnk <- rank(-stats)
+  ord <- order(rnk)
+  statsAdj <- stats[ord]
+  statsAdj <- sign(statsAdj) * (abs(statsAdj)^gseaParam)
+  statsAdj <- statsAdj/max(abs(statsAdj))
+  pathway <- unname(as.vector(na.omit(match(pathway, names(statsAdj)))))
+  pathway <- sort(pathway)
+  gseaRes <- calcGseaStat(statsAdj, selectedStats = pathway, 
+                          returnAllExtremes = TRUE)
+  bottoms <- gseaRes$bottoms
+  tops <- gseaRes$tops
+  n <- length(statsAdj)
+  xs <- as.vector(rbind(pathway - 1, pathway))
+  ys <- as.vector(rbind(bottoms, tops))
+  toPlot <- data.frame(x = c(0, xs, n + 1), y = c(0, ys, 0))
+  diff <- (max(tops) - min(bottoms))/8
+  x = y = NULL
+  g <- ggplot(toPlot, aes(x = x, y = y)) + geom_point(color = RColorBrewer::brewer.pal(11,"BrBG")[10], 
+                                                      size = 0.1) + geom_hline(yintercept = max(tops),
+                                                                               colour = RColorBrewer::brewer.pal(11,"BrBG")[2], 
+                                                                               linetype = "dashed") + geom_hline(yintercept = min(bottoms), 
+                                                                                                                 colour = RColorBrewer::brewer.pal(11,"BrBG")[2], linetype = "dashed") + geom_hline(yintercept = 0, 
+                                                                                                                                                                                                    colour = "black") + geom_line(colour = RColorBrewer::brewer.pal(11,"BrBG")[10]) + theme_bw() + 
+    geom_segment(data = data.frame(x = pathway), mapping = aes(x = x, 
+                                                               y = -diff/2, xend = x, yend = diff/2), size = ticksSize) + 
+    theme(panel.border = element_blank(), panel.grid.minor = element_blank()) + 
+    labs(x = "rank", y = "enrichment score")
+  g
+}
+ggsea <- 
+  plotEnrichment_(pathway = pathways$FANTOM_IEG, stats = forGsea) +
+  labs(title="FANTOM IEG",
+       subtitle = paste("padj =", round(fgseaRes[pathway=="FANTOM_IEG"]$padj,3), "\ngenes:", unlist(leadEdge)[1:6]%>%paste(collapse = ";"),"..."),
+       x="target rank by diagnostic events")
+ggsea
+
+### write source data as GSEA result for all pathways
+gsea_df=as.data.frame(fgseaRes[,-8])
+gsea_df$leadingEdge=unlist(lapply(fgseaRes$leadingEdge,function(x) paste(x,collapse=",")))
+
+write_csv(gsea_df%>%.[order(.$padj),], file="data/source_data/Fig_5F.csv")
+
+################################ 5G: example genome browser shots #############################################
+
+myfont="Arial"
+
+#library(Gviz)
+options(ucscChromosomeNames=FALSE)
+
+## sequence track - will see T-to-C conversions
+#library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
+sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
+
+## clip tracks
+cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1"
+                              #,stacking = "hide"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              , referenceSequence=sTrack
+)
+cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              , referenceSequence=sTrack
+)
+
+#rename tracks easily
+#cliptrack1@name <- "CLIP r1"
+#cliptrack2@name <- "CLIP r2"
+
+## gene region track
+## gencode has too many transcripts for plotting, use meta-transcript feature
+mytxdb <- loadDb("data/mytxdb.RData")
+grtrack <- GeneRegionTrack(
+  mytxdb
+  , fill="darkblue"
+  , collapseTranscripts="longest" ## show "meta" transcript to save space
+  ,fontfamily = myfont 
+  ,fontfamily.group = myfont 
+  ,fontfamily.title = myfont 
+)
+
+
+## need JUNB,FOS,EGR1
+# just look up coordinates by hand
+mygenes <- data.frame(row.names = c("EGR1","FOS","JUNB"),
+                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
+                      chr=c("chr5","chr14","chr19"),
+                      afrom=c(137800454,75744708,12901667),
+                      ato=c(137805547,75749523,12905204))
+igvs <- 
+  xyplot(1 ~ gene | gene, data = 
+           data.frame(row.names = c("EGR1","FOS","JUNB"),
+                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
+                      chr=c("chr5","chr14","chr19"),
+                      afrom=c(137800454,75744708,12901667),
+                      ato=c(137805547,75749523,12905204)), #par.settings=list(axis.text=list(fontfamily="Comic Sans MS")),
+         panel = function(x) {
+           afrom=mygenes$afrom[x]
+           ato=mygenes$ato[x]
+           chr=mygenes$chr[x]
+           plotTracks(c(cliptrack1 ,cliptrack2, grtrack),from = afrom,to = ato,chromosome = chr,type="coverage",showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
+                      main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+         }
+         , layout=c(3,1)
+         , scales = list(draw = FALSE)
+         , xlab = NULL, ylab = NULL)
+## be careful! if not full screen there wont be enough place and will get weird viewport error
+igvs
+
+## source data here are the bam files
 
 ########### Fig S5 ##########
 
@@ -479,18 +718,9 @@ write_csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="d
 
 ############# S5F: full transcript categories barplot ###########
 
-## same color scheme everywhere - put all shared into "multiple" category otherwise too many colors!
-ctrl2$tx_region <- ifelse(!grepl("_",ctrl2$region),ctrl2$region,
-                          ifelse(grepl("3'UTR",ctrl2$region),"3UTR or other","multiple non-3'UTR"))
-rmd2$tx_region <- ifelse(!grepl("_",rmd2$region),rmd2$region,
-                         ifelse(grepl("3'UTR",rmd2$region),"3UTR or other","multiple non-3'UTR"))
-allreg <- levels(factor(c(ctrl2$tx_region,rmd2$tx_region)))
-myCol <- rev(RColorBrewer::brewer.pal(n = length(allreg), "BrBG"))
-names(myCol) <- allreg
+##### please run the code for main fig 4B first
 
 ## bar plot for the figure
-ctrl2$target_group %<>% gsub("5000-38127","5000-more", .)
-rmd2$target_group %<>% gsub("5000-9399","5000-more",.)
 mybarc <- mcols(ctrl2)[,c("tx_region","target_group")]%>%as.data.frame%>%group_by(target_group,tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="DMSO")
 mybarr <- mcols(rmd2)[,c("tx_region","target_group")]%>%as.data.frame%>%group_by(target_group,tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="RMD")
 mybar <- rbind(mybarc,mybarr)
@@ -545,15 +775,79 @@ write_csv(m1, file="data/source_data/Fig_S6A.csv")
 
 ##################### S6B: motif heatmap for RMD #######################
 
-## run code for main Fig 4E first
+## run the code for main Fig 4E first
 plot_grid(pwmr,heatr, rel_widths = c(1,3))
 write_csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
 
 ########### Fig S7 ##########
 
-## B: boxplot for half-lives DMSO and RMD
+############## S7B: boxplot for half-lives DMSO and RMD ####################
 
-## C: ecdf for ARE
+## boxplot from Fabian 
+## select necessary columns and melt
+hl4 <- fab_half%>%
+  dplyr::select(X,IEG,starts_with("mean_"))%>%
+  dplyr::select(!ends_with("_log2"))%>%
+  reshape2::melt(.)
+hl4$condition <- hl4$variable%>%sub(".+_","",.)
+hl4$siCPEB4 <- hl4$variable%>%sub("mean_","",.)%>%sub("_.+","",.)
+pd = position_dodge(width = .9) ## needed to align captions 
+## do groups to get the right order 
+hl4$mygroup <- paste(hl4$condition,hl4$IEG,hl4$siCPEB4,sep="_")
+group_lengths <- summary(factor(hl4$mygroup))
+noSam=length(group_lengths) ##number of samples
+
+## add significance stars 
+## select only groups that you want to compare
+my_comparisons <- list( c("DMSO_IEG_siCPEB4", "DMSO_IEG_Ctrl")
+                        ,c("DMSO_non-IEG_siCPEB4","DMSO_non-IEG_Ctrl")
+                        ,c("RMD_IEG_siCPEB4", "RMD_IEG_Ctrl")
+                        ,c("RMD_non-IEG_siCPEB4","RMD_non-IEG_Ctrl")
+)
+## shift and y coordinateto position labels and stars:
+myshift=.6 
+myy=log2(max(hl4$value))+myshift
+
+bpstar <- 
+  ggplot(hl4, aes(mygroup, log2(value), fill=IEG))+
+  stat_boxplot(geom = 'errorbar', width=.3, position = pd) +
+  geom_boxplot(outlier.colour="black", outlier.shape=16, 
+               outlier.size=2, notch=FALSE, position = pd) +
+  scale_fill_brewer(type = "div") +
+  theme_classic(base_size = global_size) +
+  labs(y=expression('RNA '*tau[1/2]*' (h, log'[2]*')'), x="siCPEB4", fill="") +
+  ## make Fabian-like line annotations over the plot ## depends on group lengths
+  annotate(geom = "text", x=c(.25*noSam+.5,.75*noSam+.5), y = myy+6*myshift, label = c("DMSO","RMD"), size = 4) +
+  annotate(geom = "line", x = c(1,noSam/2), y = myy+5*myshift) +
+  annotate(geom = "line", x = c(noSam/2+1,noSam), y = myy+5*myshift) +
+  annotate(geom = "text", x=c(.125*noSam+.5,.375*noSam+.5, .625*noSam+.5, .875*noSam+.5), y = myy+4*myshift, label = rep(c("IEG","non IEG"),2),size = 4) + 
+  annotate(geom = "line", x = c(1,noSam/4), y = myy+3*myshift) +
+  annotate(geom = "line", x = c(noSam/4+1,noSam/2), y = myy+3*myshift) +
+  annotate(geom = "line", x = c(noSam/2+1,0.75*noSam), y = myy+3*myshift) +
+  annotate(geom = "line", x = c(0.75*noSam+1,noSam), y = myy+3*myshift) +
+  annotate(geom = "text", x=c(.125*noSam+.5,.375*noSam+.5, .625*noSam+.5, .875*noSam+.5), y = myy+2*myshift, label = rep(unique(group_lengths),2), size = 3) +
+  scale_x_discrete(labels=names(group_lengths)%>%sub(".+_","",.)%>%gsub("S140","+",.)%>%gsub("C2","-",.)%>%sub("Ctrl","-",.)%>%sub("siCPEB4","+",.)) +
+  theme(legend.position = "none") +
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif", label.y = myy) +
+  NULL
+bpstar
+
+write_csv(hl4, file = "data/source_data/Fig_S7B.csv")
+
+################### S7C: ecdf for ARE #########################
+
+## run code for Fig 5 (preface) first
+ggsiARE <- 
+  ggplot(fab_half, aes(meanlogFC_DMSO, col=ARE)) +
+  stat_ecdf(geom = "step", size=1) +
+  labs(title="", y="",x=expression('RNA '*tau[1/2]*' (log'[2]*' fold change siCPEB4/ctrl)') ) +
+  theme_classic() +
+  theme(legend.position = c(0,1), legend.justification = c(0,1),
+        legend.background = element_rect(fill=alpha("grey",0))) +
+  scale_color_manual(values = my_palette[c(3,7)],
+                     labels=summary(factor(fab_half$ARE))%>%paste(names(.),.,sep=": n=")) +
+  NULL
+ggsiARE
 
 
 
