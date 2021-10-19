@@ -12,7 +12,7 @@ if(! dir.exists(plotdir)){dir.create(plotdir)}
 .libPaths("CLIP_Rlibs") ## local path depends on mountpoint inside container!
 
 
-## additional funcitons
+## additional functions
 source("CLIP.Rprofile")
 
 
@@ -67,13 +67,19 @@ if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|
 hg19=("GRCh37.p13.genome.fa.bgz")
 
 ## annotation
-load("data/gtf.RData")
+## generate gencode v19 annotation data 
+gtf <- rtracklayer::import(con = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
+canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
+## gene2name
+gene2name <- unique(data.frame(gene_id = remove_dots(gtf$gene_id), gene_name=gtf$gene_name, gene_status=gtf$gene_status, gene_type=gtf$gene_type, stringsAsFactors = F))
+tx2name <- with(subset(gtf, type=="transcript"), unique(data.frame(transcript_id, gene_name, stringsAsFactors = F)))
+
 
 ## transcript regions
 load("data/myregions.RData")
 
 ## make reduced utrs 
-ncbi_utrs <- rtracklayer::import("ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
+ncbi_utrs <- rtracklayer::import("annotation/ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
 red_utrs <- GenomicRanges::reduce(ncbi_utrs,with.revmap=T) ##names needed for mapToTx
 canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
 red_utrs <- red_utrs%>%subset(., .@seqnames%in%canonical_chr)
@@ -86,10 +92,10 @@ load("data/bed_reduced.RData") ## these peaks are reduced (overlapping peak call
 load("data/reduced_beds_for_igv.RData") ## these peaks have transcript regions assigned
 
 ## import target genes
-load("data/csv.RData")
+load("data/target_genes.RData")
 
 ## differential expresison
-load("DEseq.RData") 
+load("data/DEseq.RData") 
 
 
 ## bam file list
@@ -128,8 +134,6 @@ allreg <- levels(factor(c(ctrl2$tx_region,rmd2$tx_region)))
 myCol <- rev(RColorBrewer::brewer.pal(n = length(allreg), "BrBG"))
 names(myCol) <- allreg
 
-ctrl2$target_group %<>% gsub("5000-38127","5000-more", .)
-rmd2$target_group %<>% gsub("5000-9399","5000-more",.)
 
 ## only show pie chart for >10 DEs
 mypiec <- mcols(ctrl2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%c("0","1-10"))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="DMSO")
@@ -161,14 +165,7 @@ dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rmd2, targetRegio
 dcvgListc$condition="DMSO"
 dcvgListr$condition="RMD"
 
-# ## different plots separately
-# ggplot2::ggplot(dcvgListc, aes(x = bins, y = meanCoverage)) + 
-#   geom_ribbon(fill=alpha("blue",.1),aes(ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
-#   geom_line(color = 'darkblue') + theme_classic2() +   labs(y="Mean coverage",x="3'UTR",title="DMSO")
-# ggplot2::ggplot(dcvgListr, aes(x = bins, y = meanCoverage)) + 
-#   geom_ribbon(fill=alpha("red",.1),aes(ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
-#   geom_line(color = 'darkred') + theme_classic2() +   labs(y="Mean coverage",x="3'UTR",title="RMD")
-## together
+## plot together
 ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
   geom_ribbon(aes(fill=condition,ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
   geom_line(aes(color = condition)) + theme_classic2() +
@@ -434,7 +431,7 @@ hlraw <- read.csv("data/hl_norm_to_ERCC92.csv"
   dplyr::select(X,ends_with("_hl"),ends_with("_R2"))%>%
   dplyr::filter(!grepl("^ERCC-",.$X))
 ## add diagnostic events and target groups
-hlraw$DEs <- csv$sumDEPerGene[match(hlraw$X,csv$gene_names)]
+hlraw$DEs <- target_genes$sumDEPerGene[match(hlraw$X,target_genes$gene_names)]
 hlraw$target_group <- Hmisc::cut2(x = hlraw$DEs,cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("46027\\]","more",.)%>%gsub("\\,","\\-",.)%>%forcats::fct_explicit_na(., "nontarget")
 ## add ARE
 hlraw$ARE <- ifelse(hlraw$X%in%AREdb$GeneName, "ARE", "non-ARE")
@@ -519,7 +516,7 @@ ggsimean
 #################### 5F: GSEA plot ################################
 
 ## exclude non ambiguous gene names (when 2 genes share a peak):
-csv_uniq <- csv%>%.[!grepl(";",.$gene_names),] 
+csv_uniq <- target_genes%>%.[!grepl(";",.$gene_names),] 
 forGsea <- csv_uniq%>%dplyr::select(gene_names,sumDEPerGene)%>%deframe
 ## first you need to download the GSEA own database for hallmark genes using gene symbols from here https://www.gsea-msigdb.org/gsea/msigdb/collections.jsp#H (login with email)
 pathways <- gmtPathways("data/h.all.v7.4.symbols.gmt") ## all pathways
@@ -716,7 +713,7 @@ pTC2 <- recordPlot()
 plot.new()
 
 plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
-write_csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="data/source_data/Fig_S5E.csv")
+write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="data/source_data/Fig_S5E.csv")
 
 ############# S5F: full transcript categories barplot ###########
 
