@@ -252,6 +252,8 @@ write_csv(forggall,file="data/source_data/Fig_4D.csv")
 
 #################### Fig 4E:  heatmap for top 100 motifs ########################
 
+## run code for 4D first
+
 mytopN=100 ##how many top k-mers (out of 4096 possible 6 mers)
 mywindow=50 ## 
 ## function to make a matrix of kmer position matches
@@ -349,7 +351,7 @@ pwmr=ggplot(df, aes(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, motif=motif)) +
 plot_grid(pwmc,heatc, rel_widths = c(1,3))
 
 ### source data provided as unscaled score matrix with cluster number
-write_csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
+write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
 
 
 #################### Fig 4F: distance to other RBPs ##################################
@@ -699,7 +701,7 @@ pairs(logCnt%>%.[,4:6], lower.panel = panel.smooth, upper.panel = panel.cor,
       gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
 p_repr_r <- recordPlot() 
 
-write_csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
+write.csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
 
 
 ########### S5E: TC conversions and mutations barplots ################
@@ -777,7 +779,7 @@ write_csv(m1, file="data/source_data/Fig_S6A.csv")
 
 ## run the code for main Fig 4E first
 plot_grid(pwmr,heatr, rel_widths = c(1,3))
-write_csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
+write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
 
 ########### Fig S7 ##########
 
