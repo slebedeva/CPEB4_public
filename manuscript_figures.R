@@ -6,14 +6,10 @@ setwd(basedir)
 ## put plots separately in a folder
 plotdir <- file.path(basedir,"plots")
 if(! dir.exists(plotdir)){dir.create(plotdir)}
+## folder for source data
+datadir <- file.path(basedir,"data/source_data")
+if(! dir.exists(datadir)){dir.create(datadir)}
 
-## library path
-# for containers
-.libPaths("CLIP_Rlibs") ## local path depends on mountpoint inside container!
-
-
-## additional functions
-source("CLIP.Rprofile")
 
 
 ###################################################### load environment ########################################################################################
@@ -22,9 +18,9 @@ source("CLIP.Rprofile")
 options(connectionObserver = NULL)
 
 mypackages <- c("plyranges"
-                ,"nVennR"
                 ,"tidyverse"
                 ,"reshape2"
+                ,"Hmisc"
                 ,"magrittr"
                 ,"ggplot2"
                 ,"ggrepel"
@@ -41,20 +37,31 @@ mypackages <- c("plyranges"
                 ,"Gviz"
                 ,"ellipse"
                 ,"BSgenome.Hsapiens.UCSC.hg19"
-                #,"TxDb.Hsapiens.UCSC.hg19.knownGene"
-                #,"Homo.sapiens"
                 ,"genomation"
-                #,"RCAS"
+                ,"RCAS"
                 ,"SRAdb"
                 ,"fgsea"
                 ,"cowplot"
                 ,"gridGraphics"
                 ,"magick"
                 ,"rio"
+                ,"extrafont"
                 )
 suppressPackageStartupMessages(lapply(mypackages, require, character.only=T))
 
+############### generate data ###################
+
+if(!file.exists("data/bed_reduced.RData")){source("process_CLIP_peaks.R")}
+if(!file.exists("data/DEseq.RData")){source("Differential_expression_analysis.R")}
+
+
 ############## load data ##############
+
+## font size for pltos
+global_size=14
+
+## custom color
+my_palette = c("grey10",RColorBrewer::brewer.pal(n = 9, "Blues")[2:7])
 
 ## define cut offs for target groups by diagnostic events
 mycuts=c(0,1,10,100,1000,5000)
@@ -67,13 +74,8 @@ if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|
 hg19=("GRCh37.p13.genome.fa.bgz")
 
 ## annotation
-## generate gencode v19 annotation data 
-gtf <- rtracklayer::import(con = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
-canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
-## gene2name
-gene2name <- unique(data.frame(gene_id = remove_dots(gtf$gene_id), gene_name=gtf$gene_name, gene_status=gtf$gene_status, gene_type=gtf$gene_type, stringsAsFactors = F))
-tx2name <- with(subset(gtf, type=="transcript"), unique(data.frame(transcript_id, gene_name, stringsAsFactors = F)))
-
+## get gencode v19 annotation data 
+load("data/gtf.RData")
 
 ## transcript regions
 load("data/myregions.RData")
@@ -88,8 +90,8 @@ names(red_utrs) <- red_utrs$name
 
 
 ## merged CLIP peaks
-load("data/bed_reduced.RData") ## these peaks are reduced (overlapping peak calls are merged)
-load("data/reduced_beds_for_igv.RData") ## these peaks have transcript regions assigned
+load("data/bed_reduced.RData") ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
+
 
 ## import target genes
 load("data/target_genes.RData")
@@ -116,7 +118,7 @@ AREdb=rio::import('Complete 3 UTR Data.xls')
 fantom_ieg=rio::import("https://ndownloader.figshare.com/files/3263948", skip=1)%>%dplyr::slice(1:232)
 
 ##clean up 
-if(file.exists("wget-log")){system("rm wget-log")}
+if(file.exists("wget-log")){system("rm wget-log*")}
 
 
 ########### Figures ################
@@ -147,9 +149,10 @@ ppie <-
   scale_fill_manual(values = myCol, name = "sites with > 10 DEs")+
   facet_wrap(~condition,dir="v")+
   NULL
-ppie
 
 write_csv(mypie, file = "data/source_data/Fig_4B.csv")
+
+save_plot("plots/Fig_4B.pdf",ppie)
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 
@@ -166,7 +169,7 @@ dcvgListc$condition="DMSO"
 dcvgListr$condition="RMD"
 
 ## plot together
-ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
+rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
   geom_ribbon(aes(fill=condition,ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
   geom_line(aes(color = condition)) + theme_classic2() +
   labs(y="CPEB4 sites \n mean coverage in 3'UTR",x=" relative 3'UTR length (%)",title="")+
@@ -176,6 +179,8 @@ ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) +
   NULL
 
 write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
+
+save_plot("plots/Fig_4C.pdf",rcaspl)
 
 ################# 4D: scatterplot of motif counts #################################
 
@@ -232,20 +237,22 @@ forggall$canonical_CPE<-forggall$kmer%in%CPEs
 ## ranking should be both for dmso and rmd of course
 cpes=subset(forggall,canonical_CPE)
 topkmers=subset(forggall,!canonical_CPE & (DMSO_ratio > 0.08 & RMD_ratio > 0.04))
-#ggkmer <- 
-ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
-  geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-  geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-  geom_point(data = topkmers, aes(col="black")) +
-  geom_point(data = cpes, aes(col="darkred")) +
-  #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
-  labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
-  theme(legend.position = "None") +
-  draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
-  theme(aspect.ratio=1) + ##square plot
-  NULL
+ggkmer <- 
+  ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
+    geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+    geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
+    geom_point(data = topkmers, aes(col="black")) +
+    geom_point(data = cpes, aes(col="darkred")) +
+    #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
+    labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
+    theme(legend.position = "None") +
+    draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
+    theme(aspect.ratio=1) + ##square plot
+    NULL
 
 write_csv(forggall,file="data/source_data/Fig_4D.csv")
+
+save_plot("plots/Fig_4D.pdf",ggkmer)
 
 #################### Fig 4E:  heatmap for top 100 motifs ########################
 
@@ -345,11 +352,12 @@ df$motif<-pwmlistr
 pwmr=ggplot(df, aes(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, motif=motif)) + 
   geom_motif(ic.scale=F) + theme_void() + ylim(0, 1) + xlim(0, .3)
 
-plot_grid(pwmc,heatc, rel_widths = c(1,3))
+fullheatc=plot_grid(pwmc,heatc, rel_widths = c(1,3))
 
 ### source data provided as unscaled score matrix with cluster number
 write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
 
+save_plot("plots/Fig_4E.pdf",fullheatc)
 
 #################### Fig 4F: distance to other RBPs ##################################
 
@@ -357,7 +365,7 @@ write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/s
 cpeb4 <- ctrl2
 cpeb4$name <- "CPEB4"
 ##import rest of RBP
-helas <- rtracklayer::import("data/allrbps.bed") ## pre-merged HeLa CLIP peaks
+helas <- rtracklayer::import("data/beds/all_HeLa_RBPs.bed") ## pre-merged HeLa CLIP peaks
 helas$name <- sub("_.+","",helas$name)
 ## important: remove EWSR because it is still not published
 helas%<>%.[.$name!="EWS"]
@@ -386,7 +394,7 @@ pabp = GenomicRanges::reduce(subset(RBPCentFilt, names(RBPCentFilt)%in%"PABP"))
 omnidistUp <- list()
 for(i in 1:length(myRBPs)) {
   if( myRBPs[i]=="PABP" ) next  #remove self self distances
-  print(myRBPs[i]) #monitor progress
+  #print(myRBPs[i]) #monitor progress
   myrbp = GenomicRanges::reduce(subset(RBPCentFilt, names(RBPCentFilt)%in%myRBPs[i]))
   ### need to be on the same UTR
   c=subset(myrbp,seqnames(myrbp)%in%seqnames(pabp))
@@ -394,7 +402,7 @@ for(i in 1:length(myRBPs)) {
   idx <- precede(c,p) #these are idx of pabp which correcponding myrbp precedes
   #omnidistUp[myRBPs[i]] = distance(c[!is.na(idx)],p[na.omit(idx)])
   if( length(idx)<10 ) next  
-  print(distance(c[!is.na(idx)],p[na.omit(idx)]))
+  #print(distance(c[!is.na(idx)],p[na.omit(idx)]))
   omnidistUp[[myRBPs[i]]] <- distance(c[!is.na(idx)],p[na.omit(idx)])
 }  
 omnidistUp %<>% .[lengths(.)>100] ##filter for RBPs with at least n=(100) distances
@@ -402,7 +410,7 @@ omnidistUp %<>% .[lengths(.)>100] ##filter for RBPs with at least n=(100) distan
 mypabp <- data.frame(Distance=unlist(omnidistUp, use.names = F),
                      RBP=paste(rep(names(omnidistUp),lengths(omnidistUp))))
 ## add median distance
-mypabp1 <- inner_join(mypabp,mypabp%>%group_by(RBP)%>%summarize(med=median(Distance)))
+mypabp1 <- dplyr::inner_join(mypabp,mypabp%>%group_by(RBP)%>%dplyr::summarize(med=median(Distance)))
 ## plot violins
 pabpdistPlot <- 
   ggplot(mypabp1,aes(RBP,Distance))+
@@ -416,17 +424,19 @@ pabpdistPlot <-
   scale_fill_gradient(high = "white", low = "coral4",
                       name="median\ndistance (nt)")+
   NULL
-pabpdistPlot
+
 
 ## source data
 mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file="data/source_data/Fig_4F.csv")
+
+save_plot("plots/Fig_4F.pdf",pabpdistPlot)
 
 ########### Fig 5 ##########
 
 ### import raw half lives and connect to target gene names and groups
 
 ## import raw half lives, remove ERCCs
-hlraw <- read.csv("data/hl_norm_to_ERCC92.csv"
+hlraw <- read.csv("data/half_lives/hl_norm_to_ERCC92.csv"
                   , stringsAsFactors = F)%>%
   dplyr::select(X,ends_with("_hl"),ends_with("_R2"))%>%
   dplyr::filter(!grepl("^ERCC-",.$X))
@@ -458,6 +468,7 @@ fab_half <- hlraw%>%
 
 write_csv(fab_half, file="data/source_data/Fig_5DE_S7C.csv")
 
+
 ##################### 5A: violin plots for half-lives ###################
 
 ## split violin plot with only DMSO and RMD 
@@ -481,9 +492,11 @@ phl <-
   geom_boxplot(width=0.15, outlier.shape = NA, coef=0) +
   #geom_point(shape=21, aes(fill=variable), color="black", stroke=.5, position=position_jitterdodge(dodge.width = 1.7, jitter.width = .1), alpha=1) + ##https://stackoverflow.com/a/24019668 ## use point because geom_jitter doesn't know fill aes
   NULL
-phl
+
 
 write_csv(hl2, file = "data/source_data/Fig_5A.csv")
+
+save_plot("plots/Fig_5A.pdf",phl)
 
 ##################### 5D: ecdf for IEGs #####################
 
@@ -499,6 +512,8 @@ ggsiIEG <-
   NULL
 ggsiIEG
 
+save_plot("plots/Fig_5D.pdf",ggsiIEG)
+
 ################### 5E: ecdf for target groups #################
 
 ggsimean <- 
@@ -513,13 +528,15 @@ ggsimean <-
   NULL
 ggsimean
 
+save_plot("plots/Fig_5E.pdf",ggsimean)
+
 #################### 5F: GSEA plot ################################
 
 ## exclude non ambiguous gene names (when 2 genes share a peak):
 csv_uniq <- target_genes%>%.[!grepl(";",.$gene_names),] 
 forGsea <- csv_uniq%>%dplyr::select(gene_names,sumDEPerGene)%>%deframe
 ## first you need to download the GSEA own database for hallmark genes using gene symbols from here https://www.gsea-msigdb.org/gsea/msigdb/collections.jsp#H (login with email)
-pathways <- gmtPathways("data/h.all.v7.4.symbols.gmt") ## all pathways
+pathways <- gmtPathways("data/GSEA/h.all.v7.4.symbols.gmt") ## all pathways
 ## add IEGs from Fantom paper as custom pathway
 pathways$FANTOM_IEG <- fantom_ieg$Hs_symbol
 set.seed(42)
@@ -562,7 +579,7 @@ ggsea <-
   labs(title="FANTOM IEG",
        subtitle = paste("padj =", round(fgseaRes[pathway=="FANTOM_IEG"]$padj,3), "\ngenes:", unlist(leadEdge)[1:6]%>%paste(collapse = ";"),"..."),
        x="target rank by diagnostic events")
-ggsea
+
 
 ### write source data as GSEA result for all pathways
 gsea_df=as.data.frame(fgseaRes[,-8])
@@ -570,9 +587,10 @@ gsea_df$leadingEdge=unlist(lapply(fgseaRes$leadingEdge,function(x) paste(x,colla
 
 write_csv(gsea_df%>%.[order(.$padj),], file="data/source_data/Fig_5F.csv")
 
+save_plot("plots/Fig_5F.pdf",ggsea)
+
 ################################ 5G: example genome browser shots #############################################
 
-myfont="Arial"
 
 #library(Gviz)
 options(ucscChromosomeNames=FALSE)
@@ -634,39 +652,48 @@ igvs <-
          , scales = list(draw = FALSE)
          , xlab = NULL, ylab = NULL)
 ## be careful! if not full screen there wont be enough place and will get weird viewport error
-igvs
 
-## source data here are the bam files
+
+## need font otherwise error saving figure
+loadfonts(device = "postscript")
+par(family="Arial")
+ps.options(family="Arial")
+myfont="Arial"
+
+fig5g=plot_grid(igvs)
+save_plot("plots/Fig_5G.pdf",fig5g)
 
 ########### Fig S5 ##########
 
 ################# S5B,C: CLIP gel images #################
 
-## add CLIP gel images
-p32 <- "data/gels/p32_clip_fabian_annotated.png"
-p32_panel <- ggdraw() + draw_image(p32, scale = 0.8)
-ir <- "data/gels/20200820-100605_irCLIP_crop.png"
-ir_panel <- ggdraw() + draw_image(ir, scale = .5, x = -.1)
-#annotate irCLIP figure
-ir_anno <- 
-  ir_panel +
-  draw_line(x = c(.4,.6),y=.75) +
-  draw_label("3xF-CPEB4", size = 18, x = .5, y = .8) +
-  ## NIR ladder 70, 95, 130, 250 Thermo #26635
-  draw_label("NIR", size = 17, x = .23, y = .75) +
-  draw_label("70", size = 14, x = .1, y = .3) +
-  draw_label("95", size = 14, x = .1, y = .41) +
-  draw_label("130", size = 14, x = .1, y = .52) +
-  draw_label("250", size = 14, x = .1, y = .63) +
-  ## annotate bands with adapters
-  draw_label("CPEB4:RNA:1 adapter", size = 10, x = .67, y = .51, hjust = 0) +
-  draw_line(x = .66, y = c(.54,.48)) +
-  draw_label("CPEB4:RNA:2 adapters", size = 10, x = .67, y = .57, hjust = 0) +
-  draw_line(x = .66, y = c(.55,.59)) +
-  NULL
-
-options(digits = 3, scipen = -2) #for consistent notation
-plot_grid(p32_panel,ir_anno,labels = "AUTO", scale = .7)
+# ## add CLIP gel images
+# p32 <- "data/gels/p32_clip_fabian_annotated.png"
+# p32_panel <- ggdraw() + draw_image(p32, scale = 0.8)
+# ir <- "data/gels/20200820-100605_irCLIP_crop.png"
+# ir_panel <- ggdraw() + draw_image(ir, scale = .5, x = -.1)
+# #annotate irCLIP figure
+# ir_anno <-
+#   ir_panel +
+#   draw_line(x = c(.4,.6),y=.75) +
+#   draw_label("3xF-CPEB4", size = 18, x = .5, y = .8) +
+#   ## NIR ladder 70, 95, 130, 250 Thermo #26635
+#   draw_label("NIR", size = 17, x = .23, y = .75) +
+#   draw_label("70", size = 14, x = .1, y = .3) +
+#   draw_label("95", size = 14, x = .1, y = .41) +
+#   draw_label("130", size = 14, x = .1, y = .52) +
+#   draw_label("250", size = 14, x = .1, y = .63) +
+#   ## annotate bands with adapters
+#   draw_label("CPEB4:RNA:1 adapter", size = 10, x = .67, y = .51, hjust = 0) +
+#   draw_line(x = .66, y = c(.54,.48)) +
+#   draw_label("CPEB4:RNA:2 adapters", size = 10, x = .67, y = .57, hjust = 0) +
+#   draw_line(x = .66, y = c(.55,.59)) +
+#   NULL
+# 
+# options(digits = 3, scipen = -2) #for consistent notation
+# blots=plot_grid(p32_panel,ir_anno,labels = "AUTO", scale = .7)
+# 
+# save_plot("plots/Fig_S5BC.pdf",blots)
 
 #################### S5D: pairs plot for CLIP replicates ###################
 
@@ -700,6 +727,7 @@ p_repr_r <- recordPlot()
 
 write.csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
 
+save_plot("plots/Fig_S5D.pdf",plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
 
 ########### S5E: TC conversions and mutations barplots ################
 
@@ -712,8 +740,11 @@ barplot(colSums(rmd[,8:27]),main="RMD",las=2)
 pTC2 <- recordPlot()
 plot.new()
 
-plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
+TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
+
 write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="data/source_data/Fig_S5E.csv")
+
+save_plot("plots/Fig_S5E.pdf",TCpl, base_height = 4, base_width = 8)
 
 ############# S5F: full transcript categories barplot ###########
 
@@ -732,20 +763,21 @@ pbar <-
   theme(axis.text.x = element_text(angle=90))  +
   facet_wrap(~condition) +
   NULL #trick to comment out things
-pbar
+
 
 write_csv(mybar, file="data/source_data/Fig_S5F.csv")
 
+save_plot("plots/Fig_S5F.pdf",pbar)
 
 ########### Fig S6 ##########
 
 ######################## S6A: DESeq foldhcange RNA-seq vs CLIP ##############################
 
 ## load previously calculated DEseq objects for RNA and CLIP 
-load("DEseq.RData") 
+load("data/DEseq.RData") 
 ## do not use log fold change shrinkage, merge RNA and CLIP fold changes and plot against each other
 unshrunk1 <- data.frame(results(dds, name="condition_R_vs_C"))
-unshrunkcl1 <- data.frame(results(ddscl, name="condition_RMD_CLIP_vs_Ctrl_CLIP"))
+unshrunkcl1 <- data.frame(results(ddscl, name="condition_R_vs_C"))
 m <- merge(data.frame(unshrunk1), data.frame(unshrunkcl1), by=0, all=F)%>%dplyr::rename(gene_name=Row.names)
 colnames(m) <- gsub(".y",".CLIP", gsub(".x",".RNAseq", colnames(m)))
 mythreshold <- 0.01 # p adj cut off for color highlighting (cut off for CLIP)
@@ -767,16 +799,17 @@ ggscat <-
   theme_classic() + theme(legend.position = "none") +
   geom_abline(lty=2, col="darkred") +
   NULL
-ggscat
 
 write_csv(m1, file="data/source_data/Fig_S6A.csv")
 
+save_plot("plots/Fig_S6A.pdf",ggscat)
 
 ##################### S6B: motif heatmap for RMD #######################
 
 ## run the code for main Fig 4E first
-plot_grid(pwmr,heatr, rel_widths = c(1,3))
+fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
 write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
+save_plot("plots/Fig_S6B.pdf",fullheatr)
 
 ########### Fig S7 ##########
 
@@ -829,9 +862,10 @@ bpstar <-
   theme(legend.position = "none") +
   stat_compare_means(comparisons = my_comparisons, label = "p.signif", label.y = myy) +
   NULL
-bpstar
 
 write_csv(hl4, file = "data/source_data/Fig_S7B.csv")
+
+save_plot("plots/Fig_S7B.pdf",bpstar)
 
 ################### S7C: ecdf for ARE #########################
 
@@ -846,12 +880,8 @@ ggsiARE <-
   scale_color_manual(values = my_palette[c(3,7)],
                      labels=summary(factor(fab_half$ARE))%>%paste(names(.),.,sep=": n=")) +
   NULL
-ggsiARE
 
-
-
-
-
+save_plot("plots/Fig_S7C.pdf",ggsiARE)
 
 
 
@@ -859,7 +889,7 @@ ggsiARE
 
 ########################reproducible environment ####################################
 
-sink(paste0(Sys.Date(),"_manuscript_figures_sessionInfo.txt"))
+sink(paste0(Sys.Date(),"_manuscript_figures_R_sessionInfo.txt"))
 sessionInfo()
 sink()
 

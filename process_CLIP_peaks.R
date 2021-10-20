@@ -8,9 +8,7 @@
 ## working dir is where this source file is
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
-.libPaths("CLIP_Rlibs") ## local path depends on mountpoint inside container!
 
-source("CLIP.Rprofile")
 
 ###################################################### load environment ########################################################################################
 
@@ -43,13 +41,16 @@ hg19=("GRCh37.p13.genome.fa.bgz")
 
 
 ####### generate gencode v19 annotation data #################
-## get gtf (once)
+
+## get gtf (only once)
 if(!file.exists("gencode.v19.annotation.gtf.gz")){system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")}
 gtf <- rtracklayer::import(con = "gencode.v19.annotation.gtf.gz")
 canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
 ## gene2name
 gene2name <- unique(data.frame(gene_id = remove_dots(gtf$gene_id), gene_name=gtf$gene_name, gene_status=gtf$gene_status, gene_type=gtf$gene_type, stringsAsFactors = F))
 tx2name <- with(subset(gtf, type=="transcript"), unique(data.frame(transcript_id, gene_name, stringsAsFactors = F)))
+
+save(gtf,canonical_chr,gene2name,tx2name,file="data/gtf.RData")
 
 ########## generate transcript regions ###################
 

@@ -8,9 +8,6 @@
 
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
-.libPaths("CLIP_Rlibs") ## local path depends on mountpoint inside container!
-
-source("CLIP.Rprofile")
 
 mypackages <- c("tidyverse"
                 ,"GenomicRanges"
