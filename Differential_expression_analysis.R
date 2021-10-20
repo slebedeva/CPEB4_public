@@ -10,6 +10,8 @@ basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
 
 mypackages <- c("tidyverse"
+                ,"dplyr"
+                ,"tibble"
                 ,"GenomicRanges"
                 ,"GenomicAlignments"
                 ,"reshape2"
@@ -20,6 +22,9 @@ suppressPackageStartupMessages(lapply(mypackages, require, character.only=T))
 
 
 ################################## DESeq analysis #####################################
+
+if(!file.exists("data/gtf.RData")){source("process_CLIP_peaks.R")}
+load("data/gtf.RData")
 
 ## import counts for RNA-seq
 fabian_rnaseq <- list.files("data/RNAseq/", pattern = "_ReadsPerGene.out.tab", full.names = T, recursive = F)
@@ -33,7 +38,7 @@ colnames(rnaseqcnt) <- paste0("rna",c(paste0(rep("C",3),1:3), paste0(rep("R",3),
 
 ## summarize counts per gene name 
 rnaseqcnt$gene_name <- gene2name$gene_name[match(sub("\\..+","",rownames(rnaseqcnt)),gene2name$gene_id)]
-rnacnt <- rnaseqcnt%>%group_by(gene_name)%>%summarize_all(sum)%>%column_to_rownames("gene_name")
+rnacnt <- rnaseqcnt%>%group_by(gene_name)%>%dplyr::summarize_all(sum)%>%column_to_rownames("gene_name")
 
 ## DESeq for RNA
 dds <- DESeqDataSetFromMatrix(countData = rnacnt,
@@ -81,7 +86,7 @@ clcnt$region <- all_red$regions
 id <- grepl(";",clcnt$gene_name)
 
 ## DE analysis
-ccnt <- clcnt[!id,]%>%group_by(gene_name)%>%summarize_all(sum)%>%column_to_rownames("gene_name")
+ccnt <- clcnt[!id,]%>%group_by(gene_name)%>%dplyr::summarize_all(sum)%>%column_to_rownames("gene_name")
 ddscl <- DESeqDataSetFromMatrix(countData = ccnt,
                                 colData = data.frame(
                                   row.names=colnames(ccnt),
