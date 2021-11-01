@@ -1,0 +1,56 @@
+## config for snakemake CLIP mapping pipeline ##
+## credit: Neel Mukherjee PARpipe (partially)
+
+
+BOWTIE_INDEX:
+  "/scratch/AG_Ohler/svetlana/Genomes/phix/bowtie_idx"
+
+PHIX:
+  "/scratch/AG_Ohler/svetlana/Genomes/phix/NC_001422.fna"
+
+FA:
+ "/scratch/AG_Ohler/Genomes/human/hg19/genomes/v19/GRCh37.p13.genome.fa"
+ # "/fast/AG_Ohler/svetlana/Stoecklin/irCLIP_20200904/hg38_HPV18/GRCh38.p5.HPV18.genome.fa" ## hg38 with HPV18 for HeLa # some proteins are expressed but can live without it
+ #"/fast/AG_Ohler/Genomes/human/hg38/genomes/GRCh38.p13.genome.fa"
+
+CHROM_SIZES:
+ "/scratch/AG_Ohler/Genomes/human/hg19/genomes/v19/GRCh37.p13.genome.fa.fai"
+ # "/fast/AG_Ohler/svetlana/Stoecklin/irCLIP_20200904/hg38_HPV18/GRCh38.p5.HPV18.genome.fa.fai"
+ #"/fast/AG_Ohler/Genomes/human/hg38/genomes/GRCh38.p13.genome.fa.fai"
+
+THREE_PRIME_ADAPTER_SEQUENCE:
+  "TGGAATTCTCGGGTGCCAAGG"
+
+REVERSE_PRIMER_SEQUENCE:
+  "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
+
+FORWARD_PRIMER_SEQUENCE:
+  "AATGATACGGCGACCACCGACAGGTTCAGAGTTCTACAGTCCGACGATCCTGATC"
+
+EASY_CLIP_FIVE_PRIME_ADAPTER_SEQUENCE:
+  "GTTCAGAGTTCTACAGTCCGACGATCCTGATC"
+
+NINETEEN_NUCLEOTIDE_MARKER_SEQUENCE:
+  "CGTACGCGGGTTTAAACGA"
+TWENTY_FOUR_NUCLEOTIDE_MARKER_SEQUENCE:
+  "CGTACGCGGAATAGTTTAAACTGT"
+
+
+THR:
+  "4"
+
+
+STAR_GENOME:
+ "/fast/AG_Ohler/Genomes/human/hg19/STARindex/50bp_star_v2.7.3a"
+ #"/fast/AG_Ohler/svetlana/Stoecklin/irCLIP_20200904/hg38_HPV18/STARindex_50bp_v2.7.3a"
+ # "/fast/AG_Ohler/Genomes/human/hg38/STARindex/STARindex_50bp_gencv35_v2.7.3a"
+  
+GTF:
+  "/fast/AG_Ohler/Genomes/human/hg19/annotation/v19/gencode.v19.annotation.gtf"
+        #"/fast/AG_Ohler/svetlana/Stoecklin/irCLIP_20200904/hg38_HPV18/gencode.v24.HPV18.annotation.gtf"
+  #"/fast/AG_Ohler/Genomes/human/hg38/annotation/gencode.v35.annotation.gtf"
+
+SEGE_IDX:
+  "/data/ohler/svetlana/genomes/hg19/hg19.segemehl.idx"
+  #"/fast/AG_Ohler/svetlana/Stoecklin/irCLIP_20200904/hg38_HPV18/hg38.HPV18.sege.idx"
+  #"/fast/AG_Ohler/svetlana/Genomes/hg38/annotation/gencode.v35.segemehl.idx"
