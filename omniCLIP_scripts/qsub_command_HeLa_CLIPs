@@ -1,0 +1,3 @@
+#!/bin/bash
+
+for rbp in rbp_list_bulk_HeLa_CLIPs; do qsub run_omniCLIP_bulk_HeLa_CLIPs.sh /fast/AG_Ohler/svetlana/HeLa_CLIPs/mapped/segemehl/$rbp; done
