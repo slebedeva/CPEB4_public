@@ -1,0 +1,70 @@
+R version 3.6.3 (2020-02-29)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Debian GNU/Linux 10 (buster)
+
+Matrix products: default
+BLAS/LAPACK: /usr/lib/x86_64-linux-gnu/libopenblasp-r0.3.5.so
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=C              LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+attached base packages:
+ [1] grid      stats4    parallel  stats     graphics  utils     datasets  grDevices methods   base     
+
+other attached packages:
+ [1] extrafont_0.17                    rio_0.5.26                        magick_2.7.1                     
+ [4] gridGraphics_0.5-1                cowplot_1.1.1                     fgsea_1.12.0                     
+ [7] Rcpp_1.0.4.6                      SRAdb_1.48.2                      RCurl_1.98-1.3                   
+[10] RSQLite_2.2.6                     RCAS_1.12.0                       motifRG_1.30.0                   
+[13] seqLogo_1.52.0                    topGO_2.38.1                      SparseM_1.81                     
+[16] GO.db_3.10.0                      graph_1.64.0                      data.table_1.14.0                
+[19] DT_0.13                           plotly_4.9.3                      genomation_1.18.0                
+[22] BSgenome.Hsapiens.UCSC.hg19_1.4.0 BSgenome_1.54.0                   ellipse_0.4.2                    
+[25] Gviz_1.30.3                       motifStack_1.30.0                 ade4_1.7-16                      
+[28] MotIV_1.42.0                      grImport2_0.2-0                   Rsamtools_2.2.3                  
+[31] rtracklayer_1.46.0                GenomicFeatures_1.38.2            AnnotationDbi_1.48.0             
+[34] Biostrings_2.54.0                 XVector_0.26.0                    DESeq2_1.26.0                    
+[37] SummarizedExperiment_1.16.1       DelayedArray_0.12.3               BiocParallel_1.20.1              
+[40] matrixStats_0.58.0                Biobase_2.46.0                    ggunchained_0.0.1                
+[43] ggpubr_0.4.0                      ggrepel_0.9.1                     Hmisc_4.5-0                      
+[46] Formula_1.2-4                     survival_3.1-12                   lattice_0.20-41                  
+[49] reshape2_1.4.4                    forcats_0.5.1                     stringr_1.4.0                    
+[52] dplyr_1.0.5                       purrr_0.3.4                       readr_1.4.0                      
+[55] tidyr_1.1.3                       tibble_3.1.1                      ggplot2_3.3.3                    
+[58] tidyverse_1.3.1                   plyranges_1.6.10                  GenomicRanges_1.38.0             
+[61] GenomeInfoDb_1.22.1               IRanges_2.20.2                    S4Vectors_0.24.4                 
+[64] BiocGenerics_0.32.0               magrittr_2.0.1                    BiocManager_1.30.10              
+
+loaded via a namespace (and not attached):
+  [1] utf8_1.1.4               tidyselect_1.1.0         htmlwidgets_1.5.3        munsell_0.5.0           
+  [5] withr_2.4.2              colorspace_2.0-0         knitr_1.32               rstudioapi_0.11         
+  [9] ggsignif_0.6.1           Rttf2pt1_1.3.8           GenomeInfoDbData_1.2.2   seqPattern_1.18.0       
+ [13] bit64_4.0.5              pheatmap_1.0.12          vctrs_0.3.7              generics_0.1.0          
+ [17] xfun_0.22                biovizBase_1.34.1        ggthemes_4.2.4           BiocFileCache_1.10.2    
+ [21] ggseqlogo_0.1            R6_2.4.1                 locfit_1.5-9.4           AnnotationFilter_1.10.0 
+ [25] bitops_1.0-6             assertthat_0.2.1         scales_1.1.1             nnet_7.3-13             
+ [29] gtable_0.3.0             ensembldb_2.10.2         rlang_0.4.10             genefilter_1.68.0       
+ [33] splines_3.6.3            extrafontdb_1.0          rstatix_0.7.0            lazyeval_0.2.2          
+ [37] GEOquery_2.54.1          impute_1.60.0            dichromat_2.0-0          broom_0.7.6             
+ [41] checkmate_2.0.0          abind_1.4-5              modelr_0.1.8             backports_1.1.6         
+ [45] tools_3.6.3              gridBase_0.4-7           ellipsis_0.3.0           RColorBrewer_1.1-2      
+ [49] proxy_0.4-25             plyr_1.8.6               base64enc_0.1-3          progress_1.2.2          
+ [53] zlibbioc_1.32.0          prettyunits_1.1.1        rpart_4.1-15             openssl_1.4.1           
+ [57] pbapply_1.4-3            haven_2.4.0              cluster_2.1.0            fs_1.4.1                
+ [61] openxlsx_4.2.3           reprex_2.0.0             ProtGenerics_1.18.0      hms_1.0.0               
+ [65] evaluate_0.14            xtable_1.8-4             XML_3.99-0.3             jpeg_0.1-8.1            
+ [69] readxl_1.3.1             gridExtra_2.3            compiler_3.6.3           biomaRt_2.42.1          
+ [73] KernSmooth_2.23-16       crayon_1.4.1             htmltools_0.5.1.1        geneplotter_1.64.0      
+ [77] lubridate_1.7.10         DBI_1.1.1                dbplyr_2.1.1             MASS_7.3-51.5           
+ [81] rappdirs_0.3.3           rGADEM_2.34.1            Matrix_1.2-18            car_3.0-10              
+ [85] cli_2.4.0                pkgconfig_2.0.3          GenomicAlignments_1.22.1 foreign_0.8-76          
+ [89] xml2_1.3.2               annotate_1.64.0          rvest_1.0.0              VariantAnnotation_1.32.0
+ [93] digest_0.6.25            fastmatch_1.1-0          rmarkdown_2.7            cellranger_1.1.0        
+ [97] htmlTable_2.1.0          curl_4.3                 lifecycle_1.0.0          jsonlite_1.7.2          
+[101] carData_3.0-4            limma_3.42.2             viridisLite_0.4.0        askpass_1.1             
+[105] fansi_0.4.1              pillar_1.6.0             httr_1.4.2               plotrix_3.8-1           
+[109] glue_1.4.0               zip_2.1.1                png_0.1-7                bit_4.0.4               
+[113] stringi_1.4.6            blob_1.2.1               org.Hs.eg.db_3.10.0      latticeExtra_0.6-29     
+[117] memoise_1.1.0           

@@ -899,9 +899,12 @@ save_plot("plots/Fig_S7C.pdf",ggsiARE)
 
 ########################reproducible environment ####################################
 
-sink(paste0(Sys.Date(),"_manuscript_figures_R_sessionInfo.txt"))
+## print all packages and versions
+options(max.print = 1000) ## so that all packages fit
+sink("R_sessionInfo.txt")
 sessionInfo()
 sink()
+options(max.print = 50)
 
 
 
