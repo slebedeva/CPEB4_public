@@ -3,6 +3,8 @@
 ## working dir is where this source file is
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
+message("your working directory is: ", getwd())
+
 ## put plots separately in a folder
 plotdir <- file.path(basedir,"plots")
 if(! dir.exists(plotdir)){dir.create(plotdir)}
@@ -50,10 +52,13 @@ mypackages <- c("plyranges"
 
 #### try to install missing packages if any (can easily fail) #####
 to_install=mypackages[!mypackages%in%installed.packages()]
-message("missing packages: ", paste(to_install,collapse=", "), "\ntrying to install...")
-BiocManager::install(pkgs = to_install,update = FALSE, ask = FALSE)
-failed=mypackages[!mypackages%in%installed.packages()]
-message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")
+
+if(length(to_install)>0){
+  message("missing packages: ", paste(to_install,collapse=", "), "\ntrying to install...")
+  BiocManager::install(pkgs = to_install,update = FALSE, ask = FALSE)
+  failed=mypackages[!mypackages%in%installed.packages()]
+  message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")
+}
 
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}

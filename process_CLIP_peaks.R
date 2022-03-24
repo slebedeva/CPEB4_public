@@ -26,11 +26,12 @@ mypackages <- c("plyranges"
                 ,"Rsamtools"
                 ,"rio"
 )
-suppressPackageStartupMessages(lapply(mypackages, require, character.only=T))
+
+pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
+if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
+
 
 ############## load data ##############
-
-
 
 ## get genome sequence (only once)
 if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|file.exists("GRCh37.p13.genome.fa.bgz"))){
@@ -129,10 +130,11 @@ rmd_red$condition <- "rmd"
 allbams <- list.files("data/bams", pattern = ".bam$", full.names = T)
 
 ## this function will add number of conversions as metadata to the reduced peak bed file 
-### as well as maxTC as thick position (if there are TCs)
+### as well as maxTC as thick position (if there are TCs) - otherwise it is just a center of the cluster
+### this function uses (R)samtools pileup
 add_conv_to_bed <- function(allbams, bed,myname){
-  ## make label
-  bed$which_label <- paste0(seqnames(bed),":",ranges(bed))
+  ## make label (important: keep strand information!)
+  bed$which_label <- paste0(seqnames(bed),":",ranges(bed),":",strand(bed))
   p_param <- PileupParam(max_depth = 1e6) 
   sbp <- ScanBamParam(which=bed)
   mypile1<-pileup(file = BamFile(allbams[1]), scanBamParam = sbp, pileupParam = p_param)
@@ -140,35 +142,41 @@ add_conv_to_bed <- function(allbams, bed,myname){
   mypile3<-pileup(file = BamFile(allbams[3]), scanBamParam = sbp, pileupParam = p_param)
   mypile <- dplyr::full_join(mypile1,mypile2,by=c("seqnames","pos","strand","nucleotide","which_label"),suffix=c("_1","_2"))
   mypile <- dplyr::full_join(mypile,mypile3,by=c("seqnames","pos","strand","nucleotide","which_label")) 
-  ## how to handle NA? put to 0 counts 
+  ## how to handle NA? put it to 0 counts 
   mypile[is.na(mypile)] <- 0
-  gr <- with(mypile, GRanges(seqnames=seqnames,ranges = IRanges(start=pos,width=1),strand = "+")) ## if I want A to G I have to have always Watson strand
+  gr <- with(mypile, GRanges(seqnames=seqnames,ranges = IRanges(start=pos,width=1),strand = "+")) ## if I want A to G I have to have always Watson strand - bam alignment always is in respect to Watson strand
   mypile$ref <- as.character(getSeq(x=FaFile(hg19), gr))
   mycoverage <- 
     mypile%>%
-    group_by(which_label)%>%
-    summarize(
+    dplyr::group_by(which_label,strand)%>%
+    dplyr::summarize(
       coverage=sum(count,count_1,count_2, na.rm = T))
+  mycoverage$which_label=paste(mycoverage$which_label,mycoverage$strand,sep=":")
+  mycoverage$strand=NULL # strand is kept in the label, otherwise granges with this metadata column cannot be created
   TCs <- subset(mypile, (ref=="T" & nucleotide=="C" & strand=="+") | (ref=="A" & nucleotide=="G" & strand=="-") )
   TDs <- subset(mypile, (ref=="T" & nucleotide=="-" & strand=="+") | (ref=="A" & nucleotide=="-" & strand=="-") )
+  #DEs=#insert also a summary of all DEs together
   # first summarize replicates per position and then max over all replicates per cluster
-  TCperCluster <- TCs%>%group_by(which_label,pos)%>%
-    summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
-    group_by(which_label)%>%
-    summarize(thickTCSum=pos[which.max(sum)], thickTCMax=pos[which.max(max)],
+  TCperCluster <- TCs%>%dplyr::group_by(which_label,pos,strand)%>%
+    dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
+    dplyr::group_by(which_label,strand)%>%
+    dplyr::summarize(thickTCSum=pos[which.max(sum)], thickTCMax=pos[which.max(max)],
               sumTC=sum(sum,na.rm = T),maxTC=max(max,na.rm = T))
-  TDperCluster <- TDs%>%group_by(which_label,pos)%>%
-    summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
-    group_by(which_label)%>%
-    summarize(thickTDSum=pos[which.max(sum)], thickTDMax=pos[which.max(max)],
+  TDperCluster <- TDs%>%dplyr::group_by(which_label,pos,strand)%>%
+    dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
+    dplyr::group_by(which_label,strand)%>%
+    dplyr::summarize(thickTDSum=pos[which.max(sum)], thickTDMax=pos[which.max(max)],
               sumTD=sum(sum,na.rm = T),maxTD=max(max,na.rm = T))
-  
+  TCperCluster$which_label=paste(TCperCluster$which_label,TCperCluster$strand,sep=":")
+  TDperCluster$which_label=paste(TDperCluster$which_label,TDperCluster$strand,sep=":")
+  TCperCluster$strand=NULL
+  TDperCluster$strand=NULL
   ## add to bed and replace NA
   mcols(bed) <- cbind(mcols(bed), 
                       mycoverage[match(bed$which_label,mycoverage$which_label),"coverage"],
                       TDperCluster[match(bed$which_label,TDperCluster$which_label),-1],
                       TCperCluster[match(bed$which_label,TCperCluster$which_label),-1])
-  bed$sumDE <- cbind(bed$sumTD,bed$sumTC)%>%rowSums(na.rm=T) ## convert NA to 0
+  bed$sumDE = (cbind(bed$sumTD,bed$sumTC)%>%rowSums(na.rm=T)) ## sum of deletions and conversions ## convert NA to 0
   return(bed)}
 
 ctrl1 <- add_conv_to_bed(allbams%>%.[!grepl("RMD",.)],ctrl_red)
@@ -220,7 +228,8 @@ rmd2$target_group <- Hmisc::cut2(rmd2$sumDE,  cuts = mycuts)%>%gsub("\\[| ","",.
 ctrl2$score <- ctrl2$sumDE
 ctrl2$name2 <- ctrl2$name
 ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
-## make "thick" point a max of TC or TD and if DEs are absent, just the middle of the cluster
+## make "thick" point a max of TC (prioritize) or TD and if DEs are absent, just the middle of the cluster
+## since the score is sum DE, it would also make sense to have sumDE as the thick point
 ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
                                     ifelse(!is.na(ctrl2$thickTDMax),ctrl2$thickTDMax,
                                            (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
@@ -240,7 +249,7 @@ export.bed(rmd2, "data/beds/CPEB4_RMD_hg19.bed")
 
 save(rmd, ctrl,rmd2,ctrl2,file="data/bed_reduced.RData") 
 
-system("rm data/bed_reduced_tmp.RData")
+#system("rm data/bed_reduced_tmp.RData")
 
 ###################### summary table of target genes ####################################
 
@@ -265,7 +274,7 @@ target_genes$gene_target_group <- Hmisc::cut2(target_genes$sumDEPerGene,  cuts =
 
 ## final table of target genes
 ## this is also the Supplementary table S6
-#write.csv(target_genes, file = "table_S6_cpeb4_target_genes.csv", row.names = F) 
+write.csv(target_genes, file = "table_S6_cpeb4_target_genes.csv", row.names = F) 
 
 save(target_genes,file="data/target_genes.RData")
 
