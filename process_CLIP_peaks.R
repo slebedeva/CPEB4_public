@@ -8,12 +8,15 @@
 ## working dir is where this source file is
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
+message("your working directory is: ", getwd())
 
 
 ###################################################### load environment ########################################################################################
 
 ## important! otherwise Hs.org.db fails ##https://support.bioconductor.org/p/9136239/#9136319
 options(connectionObserver = NULL)
+## where packages are
+.libPaths("/ohler/containers/CLIP_Rlibs/")
 
 mypackages <- c("plyranges"
                 ,"tidyverse"
@@ -25,6 +28,7 @@ mypackages <- c("plyranges"
                 ,"rtracklayer"
                 ,"Rsamtools"
                 ,"rio"
+                ,"data.table"
 )
 
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
@@ -84,10 +88,12 @@ save(myregions,file="data/myregions.RData")
 ##############import CLIP peaks (bed and txt) ##############################
 
 ## import omniCLIP predictions 
-ctrl<-read.table("data/omniCLIP/Ctrl/pred.txt", header=T, stringsAsFactors = F)
+#ctrl<-read.table("data/omniCLIP/Ctrl/pred.txt", header=T, stringsAsFactors = F)
+ctrl<-read.table("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.txt", header=T, stringsAsFactors = F) ## downsampled
 rmd<-read.table("data/omniCLIP/RMD/pred.txt", header=T, stringsAsFactors = F)
 
-cbed<-rtracklayer::import("data/omniCLIP/Ctrl/pred.bed")
+#cbed<-rtracklayer::import("data/omniCLIP/Ctrl/pred.bed")
+cbed<-rtracklayer::import("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.bed")
 rbed<-rtracklayer::import("data/omniCLIP/RMD/pred.bed")
 
 
@@ -144,6 +150,7 @@ add_conv_to_bed <- function(allbams, bed,myname){
   mypile <- dplyr::full_join(mypile,mypile3,by=c("seqnames","pos","strand","nucleotide","which_label")) 
   ## how to handle NA? put it to 0 counts 
   mypile[is.na(mypile)] <- 0
+  ## get the reference nucleotide
   gr <- with(mypile, GRanges(seqnames=seqnames,ranges = IRanges(start=pos,width=1),strand = "+")) ## if I want A to G I have to have always Watson strand - bam alignment always is in respect to Watson strand
   mypile$ref <- as.character(getSeq(x=FaFile(hg19), gr))
   mycoverage <- 
@@ -155,6 +162,9 @@ add_conv_to_bed <- function(allbams, bed,myname){
   mycoverage$strand=NULL # strand is kept in the label, otherwise granges with this metadata column cannot be created
   TCs <- subset(mypile, (ref=="T" & nucleotide=="C" & strand=="+") | (ref=="A" & nucleotide=="G" & strand=="-") )
   TDs <- subset(mypile, (ref=="T" & nucleotide=="-" & strand=="+") | (ref=="A" & nucleotide=="-" & strand=="-") )
+  # quickly check that my collection makes sense: there should be much less of TAs and TGs - correct!
+  #TAs <- subset(mypile, (ref=="T" & nucleotide=="A" & strand=="+") | (ref=="A" & nucleotide=="T" & strand=="-") )
+  #TGs <- subset(mypile, (ref=="T" & nucleotide=="G" & strand=="+") | (ref=="A" & nucleotide=="C" & strand=="-") )
   #DEs=#insert also a summary of all DEs together
   # first summarize replicates per position and then max over all replicates per cluster
   TCperCluster <- TCs%>%dplyr::group_by(which_label,pos,strand)%>%
@@ -210,7 +220,7 @@ assign_regions <- function(bed,regions){
 ctrl2 <- assign_regions(ctrl1,myregions)
 rmd2 <- assign_regions(rmd1,myregions)
 
-## apparently one cluster has NA annotation because it is overlapping a gene annotation but no transcript annotation (between 2 transcripts). 
+## apparently one cluster has NA annotation because it is overlapping a gene annotation but no transcript annotation (this gene has 2 disconnected transcript isoforms). 
 ## I would remove it since it does not make any sense.
 ctrl2 <- ctrl2[!is.na(ctrl2$region)]
 rmd2 <- rmd2[!is.na(rmd2$region)]
@@ -220,8 +230,8 @@ rmd2 <- rmd2[!is.na(rmd2$region)]
 ## define cut offs for target groups by diagnostic events
 mycuts=c(0,1,10,100,1000,5000)
 
-ctrl2$target_group <- Hmisc::cut2(ctrl2$sumDE, cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("38127\\]","more",.)%>%gsub("\\,","\\-",.)
-rmd2$target_group <- Hmisc::cut2(rmd2$sumDE,  cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("9399\\]","more",.)%>%gsub("\\,","\\-",.)
+ctrl2$target_group <- Hmisc::cut2(ctrl2$sumDE, cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("5000.+","5000,more",.)%>%gsub("\\,","\\-",.)
+rmd2$target_group <- Hmisc::cut2(rmd2$sumDE,  cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("5000.+","5000,more",.)%>%gsub("\\,","\\-",.)
 
 ################ make viewable bed to load into igv ###########################
 
@@ -274,7 +284,7 @@ target_genes$gene_target_group <- Hmisc::cut2(target_genes$sumDEPerGene,  cuts =
 
 ## final table of target genes
 ## this is also the Supplementary table S6
-write.csv(target_genes, file = "table_S6_cpeb4_target_genes.csv", row.names = F) 
+write.csv(target_genes, file = "source_data/table_S6_cpeb4_target_genes.csv", row.names = F) 
 
 save(target_genes,file="data/target_genes.RData")
 

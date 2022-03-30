@@ -72,7 +72,7 @@ if(!file.exists("data/DEseq.RData")){source("Differential_expression_analysis.R"
 
 ############## load data ##############
 
-## font size for pltos
+## font size for plots
 global_size=14
 
 ## custom color
@@ -95,7 +95,7 @@ load("data/gtf.RData")
 ## transcript regions
 load("data/myregions.RData")
 
-## make reduced utrs 
+## make reduced utrs (to avoid plotting the same UTR end multipla times)
 ncbi_utrs <- rtracklayer::import("annotation/ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
 red_utrs <- GenomicRanges::reduce(ncbi_utrs,with.revmap=T) ##names needed for mapToTx
 canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
@@ -165,6 +165,8 @@ ppie <-
   facet_wrap(~condition,dir="v")+
   NULL
 
+ppie
+
 write_csv(mypie, file = "data/source_data/Fig_4B.csv")
 
 save_plot("plots/Fig_4B.pdf",ppie)
@@ -188,6 +190,42 @@ forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
 ## more correctly: in random windows taken by proportion of the regions same as CLIP (by count or length)
 ## get all reduced regions (exons and introns)
 #all_regions_red=reduce_ranges(myregions)
+## sample random substrings of red_utr sequences several times
+## because I have ~ 20,000 sites, need maybe ~100,000 windows (2 windows per UTR)
+
+# ## very inefficient! stopped at 34k windows
+# mywind=RNAStringSet()
+# #num2sample=2
+# for(i in 1:length(myseq)){
+#   #print(i)
+#   #set.seed(i)
+#   midpoints=sample(mywindow:(width(myseq[i])-mywindow),num2sample)
+#   #print(midpoints)
+#   randstr=RNAStringSet()
+#   # for(j in 1:num2sample){
+#   #   randstr=c(randstr,Biostrings::substring(myseq[i],(midpoints[j]-0.5*mywindow)+1,midpoints[j]+0.5*mywindow))
+#   # }
+#   #print(randstr)
+#   mywind=c(mywind,randstr)
+# }
+# save(mywind, file = "data/random_utr_windows.RData")
+
+## dt is faster (NEVER nested for loops in R!) 
+## also need UTRs longer that 50!
+seqdf=setDT(data.frame(seq=myseq, Width=width(myseq)) )[Width>50,]
+set.seed(2) ## can do it many times
+myw=25
+## make midpoints (sorry ugly code, do not remember how to row-wise in dt)
+seqdf[,midpt:=(lapply(seqdf$Width, function(x) sample(myw:(x-myw),1)) %>% unlist)]#sample(myw:(Width-myw),1)]
+## take random windows
+seqdf[,rw:=substring(seq,first = midpt-myw+1,last = midpt+myw)]
+#sanity check - should all be 50
+#lapply(seqdf$rw, stringr::str_length) %>% unique()
+## count kmers in those windows
+mywind=RNAStringSet(seqdf$rw)
+myfreq <- oligonucleotideFrequency(mywind, width=k, step=1)
+mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
+forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
 
 
 ## separate intronic and UTR regions
@@ -236,8 +274,8 @@ forggr <- count_kmers(myxlr,k,mywindow)#RMD
 #forgg3utrc=count_kmers(subset(myxlc,region=="3'UTR"),k,mywindow)
 #forggintr=count_kmers(subset(myxlr,region=="intron"),k,mywindow)
 #forgg3utrr=count_kmers(subset(myxlr,region=="3'UTR"),k,mywindow)
-forgg5utrc=count_kmers(subset(myxlc,region=="5'UTR"),k,mywindow)
-forgg5utrr=count_kmers(subset(myxlr,region=="5'UTR"),k,mywindow)
+#forgg5utrc=count_kmers(subset(myxlc,region=="5'UTR"),k,mywindow)
+#forgg5utrr=count_kmers(subset(myxlr,region=="5'UTR"),k,mywindow)
 
 ## unite ctrl, rmd and background
 forggall <- forggc$kmer_cnt%>%
@@ -248,26 +286,25 @@ forggall <- forggc$kmer_cnt%>%
 ## use the same background count
 
 ##intron
-forggallint <- forggintc$kmer_cnt%>%
- dplyr::full_join(forggintr$kmer_cnt,by="kmer")%>%
- dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$intron
-  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
- mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+# forggallint <- forggintc$kmer_cnt%>%
+#  dplyr::full_join(forggintr$kmer_cnt,by="kmer")%>%
+#  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$intron
+#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+#  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+# 
+# ### 3UTR
+# forggall3utr <- forgg3utrc$kmer_cnt%>%
+#  dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
+#  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+#  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 
-### 3UTR
-forggall3utr <- forgg3utrc$kmer_cnt%>%
- dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
- dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
-  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
- mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
-
-
-##5UTR
-forggall5utr <- forgg5utrc$kmer_cnt%>%
-  dplyr::full_join(forgg5utrr$kmer_cnt,by="kmer")%>%
-  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
-  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+# ##5UTR
+# forggall5utr <- forgg5utrc$kmer_cnt%>%
+#   dplyr::full_join(forgg5utrr$kmer_cnt,by="kmer")%>%
+#   dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+#   mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 
 ## highlight CPE but because we use 6-mers we need all substrings of length 6 that fit into canonical 7-mer UUUUUAU (and others)
 allsubstr <- function(x, n) unique(substring(x, 1:(nchar(x) - n + 1), n:nchar(x)))## generate all substrings of length n: stolen https://stackoverflow.com/a/35561930
@@ -281,23 +318,24 @@ forggall$canonical_CPE<-forggall$kmer%in%CPEs
 ## just plot counts normalized to general UTR abundance
 ## ranking should be both for dmso and rmd of course
 cpes=subset(forggall,canonical_CPE)
-topkmers=subset(forggall,!canonical_CPE & (DMSO_ratio > 0.08 & RMD_ratio > 0.04))
-
-
-
-
+#topkmers=subset(forggall,!canonical_CPE & (DMSO_ratio > 0.08 & RMD_ratio > 0.04))
+## because the ratio will change, let us take top 10 or 20 motifs
+mytop=10
 plotkmer=function(forggall){
+  # k-mers to highlight
+  topkmersc=forggall%>%arrange(desc(DMSO_ratio)) %>% .[!.$canonical_CPE,] %>% head(mytop) 
+  topkmersr=forggall%>%arrange(desc(RMD_ratio)) %>% .[!.$canonical_CPE,] %>% head(mytop) 
+  topkmers=rbind(topkmersc,topkmersr) %>% unique()
+  
   g=ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + 
     theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
-    #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-    geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+    geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
     geom_text_repel(data = subset(forggall,kmer%in%CPEs), aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-    #geom_point(data = topkmers, aes(col="black")) +
-    geom_point(data = subset(forggall,kmer%in%CPEs), aes(col="darkred")) +
-    #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
+    geom_point(data = topkmers, aes(col="black")) +
+    geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
     labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
     theme(legend.position = "None") +
-    #draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
+    draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
     theme(aspect.ratio=1) + ##square plot
     NULL
   print(g)
@@ -306,20 +344,8 @@ plotkmer=function(forggall){
 
 ggkmer <- plotkmer(forggall)
 
-  # ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + 
-  #   theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
-  #   #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-  #   geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-  #   geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-  #   #geom_point(data = topkmers, aes(col="black")) +
-  #   geom_point(data = cpes, aes(col="darkred")) +
-  #   #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
-  #   labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
-  #   theme(legend.position = "None") +
-  #   #draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
-  #   theme(aspect.ratio=1) + ##square plot
-  #   NULL
-  # 
+ggkmer
+   
 write_csv(forggall,file="data/source_data/Fig_4D.csv")
 
 save_plot("plots/Fig_4D.pdf",ggkmer)
@@ -327,12 +353,12 @@ save_plot("plots/Fig_4D.pdf",ggkmer)
 
 ## add pseudocounts (does not help)
 
-# forggall %<>% 
-#   mutate(UTRp=UTR+10, DMSOp=DMSO+10, RMDp=RMD+10) %>% 
-#   mutate(DMSO_ratio_p=DMSOp/UTRp,RMD_ratio_p=RMDp/UTRp) 
+# forggall %<>%
+#   mutate(UTRp=UTR+10, DMSOp=DMSO+10, RMDp=RMD+10) %>%
+#   mutate(DMSO_ratio_p=DMSOp/UTRp,RMD_ratio_p=RMDp/UTRp)
 # 
-# ggplot(forggall,aes(DMSO_ratio_p,RMD_ratio_p))+geom_point(col=rgb(.5,.5,.5,.5)) + 
-#   theme_classic(base_size = global_size) + 
+# ggplot(forggall,aes(DMSO_ratio_p,RMD_ratio_p))+geom_point(col=rgb(.5,.5,.5,.5)) +
+#   theme_classic(base_size = global_size) +
 #   #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
 #   #geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
 #   #geom_point(data = topkmers, aes(col="black")) +
@@ -343,17 +369,33 @@ save_plot("plots/Fig_4D.pdf",ggkmer)
 #   theme(legend.position = "None") +
 #   theme(aspect.ratio=1) + ##square plot
 #   NULL
-# 
+ 
+
+## try log counts on top of pseudocounts (why did I not think of this before?)
+## this helps a bit 
+
+# forggall %<>%
+#   mutate(UTRp=log(UTR+10), DMSOp=log(DMSO+10), RMDp=log(RMD+10),DMSOr=DMSOp-UTRp,RMDr=RMDp-UTRp) 
+#   ggplot(forggall,aes(DMSOr,RMDr))+geom_point(col=rgb(.5,.5,.5,.5)) +
+#     theme_classic(base_size = global_size) +
+#     #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+#     #geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
+#     #geom_point(data = topkmers, aes(col="black")) +
+#     #geom_point(data = cpes, aes(col="darkred")) +
+#     geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03)  +
+#     #labs(x="normalized 6-mer count+10, DMSO", y="normalized 6-mer count+10, RMD") +
+#     #scale_color_manual(values = c("black","darkred")) +
+#     theme(legend.position = "None") +
+#     theme(aspect.ratio=1) + ##square plot
+#     NULL
 
 
 ## ask which sites are with GC (both intron and UTR sites are fine)
 
 
-plotkmer(forggallint)
-
-plotkmer(forggall3utr)
-
-plotkmer(forggall5utr)
+# plotkmer(forggallint)
+# plotkmer(forggall3utr)
+# plotkmer(forggall5utr)
 
 
 ## where the GC comes from - compare ctrl and rmd
@@ -465,6 +507,8 @@ pwmr=ggplot(df, aes(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, motif=motif)) +
 
 fullheatc=plot_grid(pwmc,heatc, rel_widths = c(1,3))
 
+fullheatc
+
 ### source data provided as unscaled score matrix with cluster number
 write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
 
@@ -501,10 +545,17 @@ load("data/txdbFeatures.RData")
 #dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = myxlr, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
 
 ## only 3'UTR sites
-dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
-                                                , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
-                                                , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc))  %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
+rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
+sampleN=min(length(rcasinputc),length(rcasinputr))
+dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  head(rcasinputc,sampleN)
+                                                , targetRegionsList = txdbFeatures[c("threeUTRs")]
+                                                #,sampleN = sampleN ## does not seem to work
+                                                )
+dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = head(rcasinputr, sampleN)
+                                                , targetRegionsList = txdbFeatures[c("threeUTRs")]
+                                                #,sampleN = sampleN
+                                                )
 
 dcvgListc$condition="DMSO"
 dcvgListr$condition="RMD"
@@ -518,6 +569,7 @@ rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage
   scale_color_manual(values = c("darkblue","darkred"))+
   theme(aspect.ratio = 1)+
   NULL
+rcaspl
 
 write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
 
@@ -592,6 +644,7 @@ pabpdistPlot <-
                       name="median\ndistance (nt)")+
   NULL
 
+pabpdistPlot
 
 ## source data
 mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file="data/source_data/Fig_4F.csv")
@@ -631,6 +684,7 @@ fab_half <- hlraw%>%
   mutate(stabilized_RMD=ifelse(IEG=="IEG" & meanlogFC_RMD>log2(1.5),"IEG > 1.5x stabilized",
                                ifelse(IEG=="IEG" & meanlogFC_RMD<=log2(1.5), "other IEG","non-IEG"))) ##need for highlighting IEG
 
+
 ### source data
 
 write_csv(fab_half, file="data/source_data/Fig_5DE_S7C.csv")
@@ -660,6 +714,7 @@ phl <-
   #geom_point(shape=21, aes(fill=variable), color="black", stroke=.5, position=position_jitterdodge(dodge.width = 1.7, jitter.width = .1), alpha=1) + ##https://stackoverflow.com/a/24019668 ## use point because geom_jitter doesn't know fill aes
   NULL
 
+phl
 
 write_csv(hl2, file = "data/source_data/Fig_5A.csv")
 
@@ -752,6 +807,8 @@ ggsea <-
 gsea_df=as.data.frame(fgseaRes[,-8])
 gsea_df$leadingEdge=unlist(lapply(fgseaRes$leadingEdge,function(x) paste(x,collapse=",")))
 
+ggsea
+
 write_csv(gsea_df%>%.[order(.$padj),], file="data/source_data/Fig_5F.csv")
 
 save_plot("plots/Fig_5F.pdf",ggsea)
@@ -828,6 +885,9 @@ ps.options(family="Arial")
 myfont="Arial"
 
 fig5g=plot_grid(igvs)
+
+fig5g
+
 save_plot("plots/Fig_5G.pdf",fig5g)
 
 ########### Fig S5 ##########
@@ -931,6 +991,7 @@ pbar <-
   facet_wrap(~condition) +
   NULL #trick to comment out things
 
+pbar
 
 write_csv(mybar, file="data/source_data/Fig_S5F.csv")
 
