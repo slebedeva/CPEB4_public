@@ -152,16 +152,16 @@ myCol <- rev(RColorBrewer::brewer.pal(n = length(allreg), "BrBG"))
 names(myCol) <- allreg
 
 
-## only show pie chart for >10 DEs
-mypiec <- mcols(ctrl2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%c("0","1-10"))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="DMSO")
-mypier <- mcols(rmd2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%c("0","1-10"))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="RMD")
+## only show pie chart for >=10 DEs
+mypiec <- mcols(ctrl2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%(ctrl2$target_group %>% factor %>% levels %>% .[1:2]))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="DMSO")
+mypier <- mcols(rmd2)[,c("tx_region","target_group")]%>%as.data.frame%>%dplyr::filter(!target_group%in%(rmd2$target_group %>% factor %>% levels %>% .[1:2]))%>%group_by(tx_region)%>%tally()%>%mutate(sum=sum(n), perc=n/sum, condition="RMD")
 mypie <- rbind(mypiec,mypier)
 ppie <-
   ggplot(mypie, aes(x="", y=perc, fill=tx_region))+
   geom_bar(stat="identity", color="grey") +
   coord_polar(theta = "y", direction = 1, start=0)+
   theme_void(base_size=global_size)+
-  scale_fill_manual(values = myCol, name = "sites with > 10 DEs")+
+  scale_fill_manual(values = myCol, name = "sites with >= 10 DEs")+
   facet_wrap(~condition,dir="v")+
   NULL
 
@@ -169,54 +169,51 @@ write_csv(mypie, file = "data/source_data/Fig_4B.csv")
 
 save_plot("plots/Fig_4B.pdf",ppie)
 
-################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
-
-## input : bed and gtf (functions importBed, importGtf)
-#txdbFeatures <- RCAS::getTxdbFeaturesFromGRanges(gtf)
-#save(txdbFeatures, file="data/txdbFeatures.RData")
-load("data/txdbFeatures.RData")
-
-## only 3UTR is informative so plot only this ## restrict to 10,000 examples to speed up
-dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = ctrl2, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rmd2, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-
-dcvgListc$condition="DMSO"
-dcvgListr$condition="RMD"
-
-## plot together
-rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
-  geom_ribbon(aes(fill=condition,ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
-  geom_line(aes(color = condition)) + theme_classic2() +
-  labs(y="CPEB4 sites \n mean coverage in 3'UTR",x=" relative 3'UTR length (%)",title="")+
-  scale_fill_manual(values = c(alpha("blue",.1),alpha("red",.1)))+
-  scale_color_manual(values = c("darkblue","darkred"))+
-  theme(aspect.ratio = 1)+
-  NULL
-
-write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
-
-save_plot("plots/Fig_4C.pdf",rcaspl)
-
 ################# 4D: scatterplot of motif counts #################################
 
 ### calculate background: what is kmer count in all UTRs?
 ## use reduced UTRs to avoid double counting same sequence
 
-##
+## OK my background is 3UTRs and I count kmers in everything... 
+## but how would I scale intronic background to proportion of introns? not sure 
+## ncbi UTR
 myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
+## gencode UTR
+#myseq <- RNAStringSet(x = getSeq(reduce_ranges(subset(myregions$region=="3'UTR")),x=FaFile(hg19)))
 myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
 mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
 forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
 
 ## can also count in random 50 nt windows in UTRs
+## more correctly: in random windows taken by proportion of the regions same as CLIP (by count or length)
+## get all reduced regions (exons and introns)
+#all_regions_red=reduce_ranges(myregions)
 
-###make granges for crosslink centers ("thick" position= highest DE per cluster, not filtered out sites with 0 DEs) ##
+
+## separate intronic and UTR regions
+# kmer_list=list()
+# for(region in c("3'UTR","intron")){
+#   myseq <- RNAStringSet(x = getSeq(reduce_ranges(subset(myregions,region==region)),x=FaFile(hg19)))
+#   myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
+#   mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
+#   kmer_list[[region]] <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
+# }
+# 
+
+###make granges for crosslink centers ("thick" position= highest DE per cluster per rep)
+## not filtered out sites with 0 DEs - their center is just middle point ##
 myxlc <- GRanges(seqnames = ctrl2@seqnames,
                  ranges = ctrl2$thick,
-                 strand = ctrl2@strand)
+                 strand = ctrl2@strand,
+                 region=ctrl2$region,
+                 name=ctrl2$name,
+                 score=ctrl2$score)
 myxlr <- GRanges(seqnames = rmd2@seqnames,
                  ranges = rmd2$thick,
-                 strand = rmd2@strand)
+                 strand = rmd2@strand,
+                 region=rmd2$region,
+                 name=rmd2$name,
+                 score=rmd2$score)
 
 
 ## main figure: kmer count
@@ -233,10 +230,43 @@ count_kmers <- function(myxl, k=6, mywindow=50){
 }
 forggc <- count_kmers(myxlc,k,mywindow)#Ctrl
 forggr <- count_kmers(myxlr,k,mywindow)#RMD
+
+### split by UTR/intron (only pure annotations)
+#forggintc=count_kmers(subset(myxlc,region=="intron"),k,mywindow)
+#forgg3utrc=count_kmers(subset(myxlc,region=="3'UTR"),k,mywindow)
+#forggintr=count_kmers(subset(myxlr,region=="intron"),k,mywindow)
+#forgg3utrr=count_kmers(subset(myxlr,region=="3'UTR"),k,mywindow)
+forgg5utrc=count_kmers(subset(myxlc,region=="5'UTR"),k,mywindow)
+forgg5utrr=count_kmers(subset(myxlr,region=="5'UTR"),k,mywindow)
+
 ## unite ctrl, rmd and background
 forggall <- forggc$kmer_cnt%>%
   dplyr::full_join(forggr$kmer_cnt,by="kmer")%>%
   dplyr::full_join(forgg,.,by="kmer")%>%set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+
+## use the same background count
+
+##intron
+forggallint <- forggintc$kmer_cnt%>%
+ dplyr::full_join(forggintr$kmer_cnt,by="kmer")%>%
+ dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$intron
+  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+ mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+
+### 3UTR
+forggall3utr <- forgg3utrc$kmer_cnt%>%
+ dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
+ dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+ mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+
+
+##5UTR
+forggall5utr <- forgg5utrc$kmer_cnt%>%
+  dplyr::full_join(forgg5utrr$kmer_cnt,by="kmer")%>%
+  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
   mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 
 ## highlight CPE but because we use 6-mers we need all substrings of length 6 that fit into canonical 7-mer UUUUUAU (and others)
@@ -252,22 +282,88 @@ forggall$canonical_CPE<-forggall$kmer%in%CPEs
 ## ranking should be both for dmso and rmd of course
 cpes=subset(forggall,canonical_CPE)
 topkmers=subset(forggall,!canonical_CPE & (DMSO_ratio > 0.08 & RMD_ratio > 0.04))
-ggkmer <- 
-  ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
-    geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-    geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-    geom_point(data = topkmers, aes(col="black")) +
-    geom_point(data = cpes, aes(col="darkred")) +
+
+
+
+
+plotkmer=function(forggall){
+  g=ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + 
+    theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
+    #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+    geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+    geom_text_repel(data = subset(forggall,kmer%in%CPEs), aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
+    #geom_point(data = topkmers, aes(col="black")) +
+    geom_point(data = subset(forggall,kmer%in%CPEs), aes(col="darkred")) +
     #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
     labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
     theme(legend.position = "None") +
-    draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
+    #draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
     theme(aspect.ratio=1) + ##square plot
     NULL
+  print(g)
+  return(g)
+}
 
+ggkmer <- plotkmer(forggall)
+
+  # ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + 
+  #   theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
+  #   #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+  #   geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+  #   geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
+  #   #geom_point(data = topkmers, aes(col="black")) +
+  #   geom_point(data = cpes, aes(col="darkred")) +
+  #   #geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
+  #   labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
+  #   theme(legend.position = "None") +
+  #   #draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
+  #   theme(aspect.ratio=1) + ##square plot
+  #   NULL
+  # 
 write_csv(forggall,file="data/source_data/Fig_4D.csv")
 
 save_plot("plots/Fig_4D.pdf",ggkmer)
+
+
+## add pseudocounts (does not help)
+
+# forggall %<>% 
+#   mutate(UTRp=UTR+10, DMSOp=DMSO+10, RMDp=RMD+10) %>% 
+#   mutate(DMSO_ratio_p=DMSOp/UTRp,RMD_ratio_p=RMDp/UTRp) 
+# 
+# ggplot(forggall,aes(DMSO_ratio_p,RMD_ratio_p))+geom_point(col=rgb(.5,.5,.5,.5)) + 
+#   theme_classic(base_size = global_size) + 
+#   #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
+#   #geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
+#   #geom_point(data = topkmers, aes(col="black")) +
+#   #geom_point(data = cpes, aes(col="darkred")) +
+#   geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03)  +
+#   labs(x="normalized 6-mer count+10, DMSO", y="normalized 6-mer count+10, RMD") +
+#   scale_color_manual(values = c("black","darkred")) +
+#   theme(legend.position = "None") +
+#   theme(aspect.ratio=1) + ##square plot
+#   NULL
+# 
+
+
+## ask which sites are with GC (both intron and UTR sites are fine)
+
+
+plotkmer(forggallint)
+
+plotkmer(forggall3utr)
+
+plotkmer(forggall5utr)
+
+
+## where the GC comes from - compare ctrl and rmd
+# myxl_cond <- plyranges::mutate(width = mywindow, anchor_center(myxlc)) ## make crosslink centered regions of 50nt (xl will be 25)
+# myseq <- RNAStringSet(x = getSeq(myxl_cond,x=FaFile(hg19)))
+# myfreq <- oligonucleotideFrequency(myseq, width=k, step=1)
+# par(mar=c(10,3,3,3))
+# myxl_cond[myfreq[,"CGGCGG"]>0] %>% .$region %>% factor %>% summary %>% barplot(las=2)
+## Ctrl: intron and 5'UTR, RMD: intron mostly, so these come from the few 5'UTR sites
+
 
 #################### Fig 4E:  heatmap for top 100 motifs ########################
 
@@ -373,6 +469,62 @@ fullheatc=plot_grid(pwmc,heatc, rel_widths = c(1,3))
 write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
 
 save_plot("plots/Fig_4E.pdf",fullheatc)
+
+
+################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
+
+## input : bed and gtf (functions importBed, importGtf)
+## create features list which is needed as input to the RCAS function
+if(!file.exists("data/txdbFeatures.RData")){
+  txdbFeatures <- RCAS::getTxdbFeaturesFromGRanges(gtf)
+  save(txdbFeatures, file="data/txdbFeatures.RData")
+}
+load("data/txdbFeatures.RData")
+
+## only 3UTR is informative so plot only this 
+## restrict to 5,000 examples to speed up
+# dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = ctrl2%>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
+# , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+# dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rmd2%>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
+# , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+
+## plot windows of the same size around croslsink center instead of actual bed peaks
+## the sequence is included in the objects above when I counted k-mers %>% 
+## this still does not make it equal - maybe because it randomly selects from more sites?
+# dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% .[order(-.$score)] %>% .[1:10000]
+#                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+# dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[order(-.$score)] %>% .[1:10000]
+#                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+
+## only crosslinks (also not equal)
+#dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = myxlc, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+#dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = myxlr, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+
+## only 3'UTR sites
+dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
+                                                , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
+                                                , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+
+dcvgListc$condition="DMSO"
+dcvgListr$condition="RMD"
+
+## plot together
+rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
+  geom_ribbon(aes(fill=condition,ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
+  geom_line(aes(color = condition)) + theme_classic2() +
+  labs(y="CPEB4 sites \n mean coverage in 3'UTR",x=" relative 3'UTR length (%)",title="")+
+  scale_fill_manual(values = c(alpha("blue",.1),alpha("red",.1)))+
+  scale_color_manual(values = c("darkblue","darkred"))+
+  theme(aspect.ratio = 1)+
+  NULL
+
+write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
+
+save_plot("plots/Fig_4C.pdf",rcaspl)
+
+
+
 
 #################### Fig 4F: distance to other RBPs ##################################
 
@@ -615,12 +767,12 @@ options(ucscChromosomeNames=FALSE)
 sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
 
 ## clip tracks
-cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1"
+cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
                               #,stacking = "hide"
                               , fontfamily="Arial",fontfamily.title="Arial"
                               , referenceSequence=sTrack
 )
-cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3"
+cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
                               , fontfamily="Arial",fontfamily.title="Arial"
                               , referenceSequence=sTrack
 )
