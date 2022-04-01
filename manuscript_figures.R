@@ -18,6 +18,8 @@ if(! dir.exists(datadir)){dir.create(datadir)}
 
 ## important! otherwise Hs.org.db fails ##https://support.bioconductor.org/p/9136239/#9136319
 options(connectionObserver = NULL)
+## where packages are
+.libPaths("/ohler/containers/CLIP_Rlibs/")
 
 mypackages <- c("plyranges"
                 ,"tidyverse"
@@ -66,6 +68,9 @@ if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],
 
 ############### generate data ###################
 
+ann_dir="./annotation"
+
+if(!file.exists("annotation/myregions.RData")){source("generate_annotation.R")}
 if(!file.exists("data/bed_reduced.RData")){source("process_CLIP_peaks.R")}
 if(!file.exists("data/DEseq.RData")){source("Differential_expression_analysis.R")}
 
@@ -90,18 +95,11 @@ hg19=("GRCh37.p13.genome.fa.bgz")
 
 ## annotation
 ## get gencode v19 annotation data 
-load("data/gtf.RData")
+load(file.path(ann_dir,"gtf.RData"))
 
 ## transcript regions
-load("data/myregions.RData")
+load(file.path(ann_dir,"myregions.RData"))
 
-## make reduced utrs (to avoid plotting the same UTR end multipla times)
-ncbi_utrs <- rtracklayer::import("annotation/ncbi_refseq_utrs.bed") ## downloaded from ucsc table browser
-red_utrs <- GenomicRanges::reduce(ncbi_utrs,with.revmap=T) ##names needed for mapToTx
-canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
-red_utrs <- red_utrs%>%subset(., .@seqnames%in%canonical_chr)
-red_utrs$name <- ncbi_utrs$name[unlist(lapply(red_utrs$revmap, function(x) return(x[[1]])))]
-names(red_utrs) <- red_utrs$name
 
 
 ## merged CLIP peaks
@@ -177,39 +175,20 @@ save_plot("plots/Fig_4B.pdf",ppie)
 ## use reduced UTRs to avoid double counting same sequence
 
 ## OK my background is 3UTRs and I count kmers in everything... 
-## but how would I scale intronic background to proportion of introns? not sure 
+ 
 ## ncbi UTR
-myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
-## gencode UTR
-#myseq <- RNAStringSet(x = getSeq(reduce_ranges(subset(myregions$region=="3'UTR")),x=FaFile(hg19)))
-myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
-mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
-forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
+#myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
+
+## gencode reduced 3'UTRs 
+myseq <- RNAStringSet(x = getSeq(red_3utrs,x=FaFile(hg19)))
+# myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
+# mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
+# forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
 
 ## can also count in random 50 nt windows in UTRs
-## more correctly: in random windows taken by proportion of the regions same as CLIP (by count or length)
-## get all reduced regions (exons and introns)
-#all_regions_red=reduce_ranges(myregions)
+## more correctly would be: in random windows taken by proportion of the regions same as CLIP (by count or length)
 ## sample random substrings of red_utr sequences several times
-## because I have ~ 20,000 sites, need maybe ~100,000 windows (2 windows per UTR)
-
-# ## very inefficient! stopped at 34k windows
-# mywind=RNAStringSet()
-# #num2sample=2
-# for(i in 1:length(myseq)){
-#   #print(i)
-#   #set.seed(i)
-#   midpoints=sample(mywindow:(width(myseq[i])-mywindow),num2sample)
-#   #print(midpoints)
-#   randstr=RNAStringSet()
-#   # for(j in 1:num2sample){
-#   #   randstr=c(randstr,Biostrings::substring(myseq[i],(midpoints[j]-0.5*mywindow)+1,midpoints[j]+0.5*mywindow))
-#   # }
-#   #print(randstr)
-#   mywind=c(mywind,randstr)
-# }
-# save(mywind, file = "data/random_utr_windows.RData")
-
+## because I have ~ 20,000 sites, need maybe ~40,000 windows (1 window per UTR, can repeat with different seed)
 ## dt is faster (NEVER nested for loops in R!) 
 ## also need UTRs longer that 50!
 seqdf=setDT(data.frame(seq=myseq, Width=width(myseq)) )[Width>50,]
@@ -223,6 +202,7 @@ seqdf[,rw:=substring(seq,first = midpt-myw+1,last = midpt+myw)]
 #lapply(seqdf$rw, stringr::str_length) %>% unique()
 ## count kmers in those windows
 mywind=RNAStringSet(seqdf$rw)
+k=6
 myfreq <- oligonucleotideFrequency(mywind, width=k, step=1)
 mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
 forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
@@ -255,7 +235,7 @@ myxlr <- GRanges(seqnames = rmd2@seqnames,
 
 
 ## main figure: kmer count
-k=6 # count 6-mers having in mind AAUAAA
+#k=6 # count 6-mers having in mind AAUAAA
 mywindow=50
 ## the window is asymmetrical because the last 6-mer will fit on position 45:50 
 count_kmers <- function(myxl, k=6, mywindow=50){
@@ -517,13 +497,17 @@ save_plot("plots/Fig_4E.pdf",fullheatc)
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 
-## input : bed and gtf (functions importBed, importGtf)
+## annotation
+
+#gtf <- rtracklayer::import(con = "gencode.v19.annotation.gtf.gz")
+
 ## create features list which is needed as input to the RCAS function
-if(!file.exists("data/txdbFeatures.RData")){
+if(!file.exists(file.path(ann_dir,"txdbFeatures.RData"))){
   txdbFeatures <- RCAS::getTxdbFeaturesFromGRanges(gtf)
-  save(txdbFeatures, file="data/txdbFeatures.RData")
+  save(txdbFeatures, file=file.path(ann_dir,"txdbFeatures.RData"))
 }
-load("data/txdbFeatures.RData")
+load(file.path(ann_dir,"txdbFeatures.RData"))
+
 
 ## only 3UTR is informative so plot only this 
 ## restrict to 5,000 examples to speed up
@@ -531,6 +515,13 @@ load("data/txdbFeatures.RData")
 # , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
 # dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rmd2%>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
 # , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+# original sites
+rcasinputc=ctrl2  %>% subsetByOverlaps(x = ., ranges = txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)] %>% head(5000)
+rcasinputr=rmd2 %>% subsetByOverlaps(x = ., ranges = txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)] %>% head(5000)
+#rcasinputc=ctrl2  %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(4000)
+#rcasinputr=rmd2 %>% .[.$region=="3'UTR"]  %>% .[order(-.$score)] %>% head(4000)
+
+
 
 ## plot windows of the same size around croslsink center instead of actual bed peaks
 ## the sequence is included in the objects above when I counted k-mers %>% 
@@ -539,20 +530,27 @@ load("data/txdbFeatures.RData")
 #                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
 # dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[order(-.$score)] %>% .[1:10000]
 #                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+## only 3'UTR sites, plot windows around XL
+rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within")  %>% .[order(-.$score)] #%>% head(2000) ##%>% .[.$score>0]
+rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]# %>% head(2000)
+#rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc))  %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(4000)
+#rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[.$region=="3'UTR"]  %>% .[order(-.$score)] %>% head(4000)
 
 ## only crosslinks (also not equal)
 #dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = myxlc, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
 #dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = myxlr, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+#just crosslinks
+#rcasinputc=myxlc  %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
+#rcasinputr=myxlr %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
 
-## only 3'UTR sites
-rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc))  %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
-rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
 sampleN=min(length(rcasinputc),length(rcasinputr))
-dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  head(rcasinputc,sampleN)
+sampleN
+
+dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc
                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")]
                                                 #,sampleN = sampleN ## does not seem to work
                                                 )
-dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = head(rcasinputr, sampleN)
+dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr
                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")]
                                                 #,sampleN = sampleN
                                                 )
@@ -598,14 +596,14 @@ RBPcenters <- GRanges(seqnames = seqnames(allrbps),
 names(RBPcenters) <- RBPcenters$name
 RBPcenters <-unique(RBPcenters) 
 ## map RBP site centers to UTR
-RBPCentersOnUtrs <- mapToTranscripts(x = RBPcenters, transcripts = red_utrs) 
+RBPCentersOnUtrs <- mapToTranscripts(x = RBPcenters, transcripts = red_3utrs)
 myRBPs=levels(factor(names(RBPCentersOnUtrs)))
 ## inside RBP centers mapped to 3UTRs, find distance to nearest other side (NA if no other site in the same UTR)
 dist2RBP <- function(RBP1,RBP2,RBPonTx){
   return(distanceToNearest(x = GenomicRanges::reduce(subset(RBPonTx, names(RBPonTx)%in%RBP1)),
                            subject = GenomicRanges::reduce(subset(RBPonTx, names(RBPonTx)%in%RBP2)))@elementMetadata$distance)}
 # filter sites on last 500nt of 3'UTR
-RBPCentersOnUtrs$distance_from_utr_end=width(red_utrs[RBPCentersOnUtrs$transcriptsHits])-RBPCentersOnUtrs@ranges@start
+RBPCentersOnUtrs$distance_from_utr_end=width(red_3utrs[RBPCentersOnUtrs$transcriptsHits])-RBPCentersOnUtrs@ranges@start
 RBPCentFilt <- RBPCentersOnUtrs%>%.[.$distance_from_utr_end<=500] 
 
 ## take distances only upstream of PABP (but 3'UTRs are reduced so of course we have internal APASs)
@@ -618,7 +616,7 @@ for(i in 1:length(myRBPs)) {
   ### need to be on the same UTR
   c=subset(myrbp,seqnames(myrbp)%in%seqnames(pabp))
   p=subset(pabp,seqnames(pabp)%in%seqnames(myrbp))
-  idx <- precede(c,p) #these are idx of pabp which correcponding myrbp precedes
+  idx <- precede(c,p) #these are idx of pabp which corresponding myrbp precedes
   #omnidistUp[myRBPs[i]] = distance(c[!is.na(idx)],p[na.omit(idx)])
   if( length(idx)<10 ) next  
   #print(distance(c[!is.na(idx)],p[na.omit(idx)]))
@@ -815,6 +813,12 @@ save_plot("plots/Fig_5F.pdf",ggsea)
 
 ################################ 5G: example genome browser shots #############################################
 
+## need font otherwise error saving figure
+loadfonts(device = "postscript")
+par(family="Arial")
+ps.options(family="Arial")
+myfont="Arial"
+
 
 #library(Gviz)
 options(ucscChromosomeNames=FALSE)
@@ -840,7 +844,7 @@ cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
 
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
-mytxdb <- loadDb("data/mytxdb.RData")
+mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
 grtrack <- GeneRegionTrack(
   mytxdb
   , fill="darkblue"
@@ -877,18 +881,16 @@ igvs <-
          , xlab = NULL, ylab = NULL)
 ## be careful! if not full screen there wont be enough place and will get weird viewport error
 
-
-## need font otherwise error saving figure
-loadfonts(device = "postscript")
-par(family="Arial")
-ps.options(family="Arial")
-myfont="Arial"
-
 fig5g=plot_grid(igvs)
 
 fig5g
 
 save_plot("plots/Fig_5G.pdf",fig5g)
+
+### new panel to zoom in
+
+## need bed track
+
 
 ########### Fig S5 ##########
 
@@ -1028,6 +1030,8 @@ ggscat <-
   geom_abline(lty=2, col="darkred") +
   NULL
 
+ggscat
+
 write_csv(m1, file="data/source_data/Fig_S6A.csv")
 
 save_plot("plots/Fig_S6A.pdf",ggscat)
@@ -1036,6 +1040,7 @@ save_plot("plots/Fig_S6A.pdf",ggscat)
 
 ## run the code for main Fig 4E first
 fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
+fullheatr
 write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
 save_plot("plots/Fig_S6B.pdf",fullheatr)
 
@@ -1091,6 +1096,8 @@ bpstar <-
   stat_compare_means(comparisons = my_comparisons, label = "p.signif", label.y = myy) +
   NULL
 
+bpstar
+
 write_csv(hl4, file = "data/source_data/Fig_S7B.csv")
 
 save_plot("plots/Fig_S7B.pdf",bpstar)
@@ -1108,7 +1115,7 @@ ggsiARE <-
   scale_color_manual(values = my_palette[c(3,7)],
                      labels=summary(factor(fab_half$ARE))%>%paste(names(.),.,sep=": n=")) +
   NULL
-
+ggsiARE
 save_plot("plots/Fig_S7C.pdf",ggsiARE)
 
 
@@ -1118,7 +1125,7 @@ save_plot("plots/Fig_S7C.pdf",ggsiARE)
 ########################reproducible environment ####################################
 
 ## print all packages and versions
-options(max.print = 1000) ## so that all packages fit
+options(max.print = 100000) ## so that all packages fit
 sink("R_sessionInfo.txt")
 sessionInfo()
 sink()

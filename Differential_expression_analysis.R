@@ -9,6 +9,12 @@
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
 
+ann_dir="./annotation"
+
+
+## where packages are
+.libPaths("/ohler/containers/CLIP_Rlibs/")
+
 mypackages <- c("tidyverse"
                 ,"dplyr"
                 ,"tibble"
@@ -35,8 +41,8 @@ if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],
 
 ################################## DESeq analysis #####################################
 
-if(!file.exists("data/gtf.RData")){source("process_CLIP_peaks.R")}
-load("data/gtf.RData")
+if(!file.exists("annotation/gtf.RData")){source("process_CLIP_peaks.R")}
+load(file.path(ann_dir,"gtf.RData"))
 
 ## import counts for RNA-seq
 fabian_rnaseq <- list.files("data/RNAseq/", pattern = "_ReadsPerGene.out.tab", full.names = T, recursive = F)

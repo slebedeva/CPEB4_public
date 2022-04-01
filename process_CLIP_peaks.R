@@ -1,14 +1,16 @@
-### Analyze omniCLIP peaks for CPEB4
-
-## This script will take raw omniCLIP output,
-## merge overlapping peaks, assign them to genes and transcript regions, 
-## and add the count of diagnostic events (T-to-C converisons and T deletions).
-## It will output viewable bed files and the list of CPEB4 target genes.
-
 ## working dir is where this source file is
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
 message("your working directory is: ", getwd())
+
+## put plots separately in a folder
+plotdir <- file.path(basedir,"plots")
+if(! dir.exists(plotdir)){dir.create(plotdir)}
+## folder for source data
+datadir <- file.path(basedir,"data/source_data")
+if(! dir.exists(datadir)){dir.create(datadir)}
+
+ann_dir="./annotation"
 
 
 ###################################################### load environment ########################################################################################
@@ -21,79 +23,71 @@ options(connectionObserver = NULL)
 mypackages <- c("plyranges"
                 ,"tidyverse"
                 ,"reshape2"
+                ,"Hmisc"
                 ,"magrittr"
+                ,"ggplot2"
+                ,"ggrepel"
+                ,"ggpubr"
+                ,"ggunchained"
+                ,"lattice"
+                ,"DESeq2"
                 ,"Biostrings"
                 ,"GenomicRanges"
                 ,"GenomicFeatures"
                 ,"rtracklayer"
                 ,"Rsamtools"
+                ,"motifStack"
+                ,"Gviz"
+                ,"ellipse"
+                ,"BSgenome.Hsapiens.UCSC.hg19"
+                ,"genomation"
+                ,"RCAS"
+                ,"SRAdb"
+                ,"fgsea"
+                ,"cowplot"
+                ,"gridGraphics"
+                ,"magick"
                 ,"rio"
-                ,"data.table"
+                ,"extrafont"
 )
+
+#### try to install missing packages if any (can easily fail) #####
+to_install=mypackages[!mypackages%in%installed.packages()]
+
+if(length(to_install)>0){
+  message("missing packages: ", paste(to_install,collapse=", "), "\ntrying to install...")
+  BiocManager::install(pkgs = to_install,update = FALSE, ask = FALSE)
+  failed=mypackages[!mypackages%in%installed.packages()]
+  message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")
+}
 
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
 
 
-############## load data ##############
 
-## get genome sequence (only once)
-if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|file.exists("GRCh37.p13.genome.fa.bgz"))){
-  system("wget http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/GRCh37.p13.genome.fa.gz")
-  system("gunzip -c GRCh37.p13.genome.fa.gz | bgzip  > GRCh37.p13.genome.fa.bgz")
-}
+
+
+################## load annotation ###################
+
+if(!file.exists("annotation/myregions.RData")){source("generate_annotation.R")}
+
 hg19=("GRCh37.p13.genome.fa.bgz")
-
-
-####### generate gencode v19 annotation data #################
-
-## get gtf (only once)
-if(!file.exists("gencode.v19.annotation.gtf.gz")){system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")}
-gtf <- rtracklayer::import(con = "gencode.v19.annotation.gtf.gz")
-canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
-## gene2name
-gene2name <- unique(data.frame(gene_id = remove_dots(gtf$gene_id), gene_name=gtf$gene_name, gene_status=gtf$gene_status, gene_type=gtf$gene_type, stringsAsFactors = F))
-tx2name <- with(subset(gtf, type=="transcript"), unique(data.frame(transcript_id, gene_name, stringsAsFactors = F)))
-
-save(gtf,canonical_chr,gene2name,tx2name,file="data/gtf.RData")
-
-########## generate transcript regions ###################
-
-mytxdb <- makeTxDbFromGFF(file="gencode.v19.annotation.gtf.gz")
-saveDb(mytxdb,file = "data/mytxdb.RData")
-
-threeutrs <-threeUTRsByTranscript(mytxdb, use.names=T)
-fiveutrs <- fiveUTRsByTranscript(mytxdb, use.names=T)
-cdss <- cdsBy(mytxdb, by="tx", use.names=T)
-intr <- intronsByTranscript(mytxdb, use.names=T)
-ex <- exonsBy(mytxdb, by="tx", use.names=T)
-
-threutrs <-unlist(threeutrs)
-threutrs$region<-"3'UTR"
-fivutrs <- unlist(fiveutrs)
-fivutrs$region <- "5'UTR"
-cdsss <- unlist(cdss)
-cdsss$region <- "CDS"
-## protein coding regions
-pcg <- c(fivutrs,threutrs,cdsss)
-## non coding 
-ncexs <- unlist(ex)[!names(unlist(ex))%in%names(pcg)] ## noncoding=which do not have utrs or cdss
-ncexs$region <- "non-coding"
-int <- unlist(intr)
-int$region <- "intron"
-myregions <- c(pcg,ncexs,int)
-
-save(myregions,file="data/myregions.RData")
+mytxdb=loadDb(file = "annotation/mytxdb.RData")
+load("annotation/gtf.RData")
+load("annotation/myregions.RData")
 
 ##############import CLIP peaks (bed and txt) ##############################
 
 ## import omniCLIP predictions 
-#ctrl<-read.table("data/omniCLIP/Ctrl/pred.txt", header=T, stringsAsFactors = F)
-ctrl<-read.table("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.txt", header=T, stringsAsFactors = F) ## downsampled
+ctrl<-read.table("data/omniCLIP/Ctrl/pred.txt", header=T, stringsAsFactors = F)
+#ctrl<-read.table("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.txt", header=T, stringsAsFactors = F) ## downsampled
+#ctrl<-read.table("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter2/pred.txt", header=T, stringsAsFactors = F) ## downsampled
 rmd<-read.table("data/omniCLIP/RMD/pred.txt", header=T, stringsAsFactors = F)
 
-#cbed<-rtracklayer::import("data/omniCLIP/Ctrl/pred.bed")
-cbed<-rtracklayer::import("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.bed")
+cbed<-rtracklayer::import("data/omniCLIP/Ctrl/pred.bed")
+#cbed<-rtracklayer::import("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter1/pred.bed") # downsampled
+#cbed<-rtracklayer::import("/ohler/Stoecklin/downsampling_analysis/Ctrl/iter2/pred.bed") # downsampled
 rbed<-rtracklayer::import("data/omniCLIP/RMD/pred.bed")
 
 
@@ -240,16 +234,17 @@ ctrl2$name2 <- ctrl2$name
 ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
 ## make "thick" point a max of TC (prioritize) or TD and if DEs are absent, just the middle of the cluster
 ## since the score is sum DE, it would also make sense to have sumDE as the thick point
-ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
-                                    ifelse(!is.na(ctrl2$thickTDMax),ctrl2$thickTDMax,
+## right now prioritize TC to TD, but should do the sum of both (in the function above)
+ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCSum),ctrl2$thickTCSum,
+                                    ifelse(!is.na(ctrl2$thickTDSum),ctrl2$thickTDSum,
                                            (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
                                     width=1)
 export.bed(ctrl2, "data/beds/CPEB4_Ctrl_hg19.bed")
 rmd2$score <- rmd2$sumDE
 rmd2$name2 <- rmd2$name
 rmd2$name <- paste(rmd2$name,rmd2$condition,sep="@")
-rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCMax),rmd2$thickTCMax,
-                                    ifelse(!is.na(rmd2$thickTDMax),rmd2$thickTDMax,
+rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCSum),rmd2$thickTCSum,
+                                    ifelse(!is.na(rmd2$thickTDSum),rmd2$thickTDSum,
                                            (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
                        width=1)
 
@@ -281,10 +276,10 @@ target_genes <- data.frame(c(rmd2,ctrl2))%>%dplyr::group_by(gene_names)%>%dplyr:
 
 ## add target groups per gene and unique reigons 
 target_genes$gene_target_group <- Hmisc::cut2(target_genes$sumDEPerGene,  cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("46027\\]","more",.)%>%gsub("\\,","\\-",.)
-
+target_genes
 ## final table of target genes
 ## this is also the Supplementary table S6
-write.csv(target_genes, file = "source_data/table_S6_cpeb4_target_genes.csv", row.names = F) 
+write.csv(target_genes, file = file.path(datadir,"table_S6_cpeb4_target_genes.csv"), row.names = F) 
 
 save(target_genes,file="data/target_genes.RData")
 
