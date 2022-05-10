@@ -138,8 +138,11 @@ add_conv_to_bed <- function(allbams, bed,myname){
   p_param <- PileupParam(max_depth = 1e6) 
   sbp <- ScanBamParam(which=bed)
   mypile1<-pileup(file = BamFile(allbams[1]), scanBamParam = sbp, pileupParam = p_param)
+  gc()
   mypile2<-pileup(file = BamFile(allbams[2]), scanBamParam = sbp, pileupParam = p_param)
+  gc()
   mypile3<-pileup(file = BamFile(allbams[3]), scanBamParam = sbp, pileupParam = p_param)
+  gc()
   mypile <- dplyr::full_join(mypile1,mypile2,by=c("seqnames","pos","strand","nucleotide","which_label"),suffix=c("_1","_2"))
   mypile <- dplyr::full_join(mypile,mypile3,by=c("seqnames","pos","strand","nucleotide","which_label")) 
   ## how to handle NA? put it to 0 counts 
@@ -159,7 +162,7 @@ add_conv_to_bed <- function(allbams, bed,myname){
   # quickly check that my collection makes sense: there should be much less of TAs and TGs - correct!
   #TAs <- subset(mypile, (ref=="T" & nucleotide=="A" & strand=="+") | (ref=="A" & nucleotide=="T" & strand=="-") )
   #TGs <- subset(mypile, (ref=="T" & nucleotide=="G" & strand=="+") | (ref=="A" & nucleotide=="C" & strand=="-") )
-  #DEs=#insert also a summary of all DEs together
+  DEs=subset(mypile, (ref=="T" & nucleotide%in%c("C","-") & strand=="+") | (ref=="A" & nucleotide%in%c("G","-") & strand=="-") )#insert also a summary of all DEs together
   # first summarize replicates per position and then max over all replicates per cluster
   TCperCluster <- TCs%>%dplyr::group_by(which_label,pos,strand)%>%
     dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
@@ -167,20 +170,30 @@ add_conv_to_bed <- function(allbams, bed,myname){
     dplyr::summarize(thickTCSum=pos[which.max(sum)], thickTCMax=pos[which.max(max)],
               sumTC=sum(sum,na.rm = T),maxTC=max(max,na.rm = T))
   TDperCluster <- TDs%>%dplyr::group_by(which_label,pos,strand)%>%
-    dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
-    dplyr::group_by(which_label,strand)%>%
-    dplyr::summarize(thickTDSum=pos[which.max(sum)], thickTDMax=pos[which.max(max)],
-              sumTD=sum(sum,na.rm = T),maxTD=max(max,na.rm = T))
+  dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
+  dplyr::group_by(which_label,strand)%>%
+  dplyr::summarize(thickTDSum=pos[which.max(sum)], thickTDMax=pos[which.max(max)],
+            sumTD=sum(sum,na.rm = T),maxTD=max(max,na.rm = T))
+  ## count all DEs together
+  DEperCluster <- DEs%>%dplyr::group_by(which_label,pos,strand)%>%
+  dplyr::summarize(max=max(count,count_1,count_2,na.rm = T),sum=sum(count,count_1,count_2,na.rm = T))%>%
+  dplyr::group_by(which_label,strand)%>%
+  dplyr::summarize(thickDESum=pos[which.max(sum)], thickDEMax=pos[which.max(max)],
+            sumDE=sum(sum,na.rm = T),maxDE=max(max,na.rm = T))
+  DEperCluster$which_label=paste(DEperCluster$which_label,DEperCluster$strand,sep=":")
   TCperCluster$which_label=paste(TCperCluster$which_label,TCperCluster$strand,sep=":")
   TDperCluster$which_label=paste(TDperCluster$which_label,TDperCluster$strand,sep=":")
-  TCperCluster$strand=NULL
+  DEperCluster$strand=NULL
   TDperCluster$strand=NULL
+  TCperCluster$strand=NULL
   ## add to bed and replace NA
-  mcols(bed) <- cbind(mcols(bed), 
-                      mycoverage[match(bed$which_label,mycoverage$which_label),"coverage"],
-                      TDperCluster[match(bed$which_label,TDperCluster$which_label),-1],
-                      TCperCluster[match(bed$which_label,TCperCluster$which_label),-1])
-  bed$sumDE = (cbind(bed$sumTD,bed$sumTC)%>%rowSums(na.rm=T)) ## sum of deletions and conversions ## convert NA to 0
+  mcols(bed) <- cbind(mcols(bed) 
+                      ,mycoverage[match(bed$which_label,mycoverage$which_label),"coverage"]
+                      ,DEperCluster[match(bed$which_label,DEperCluster$which_label),-1]
+                      ,TCperCluster[match(bed$which_label,TCperCluster$which_label),-1]
+                      ,TDperCluster[match(bed$which_label,TDperCluster$which_label),-1]
+                      )
+  #bed$sumDE = (cbind(bed$sumTD,bed$sumTC)%>%rowSums(na.rm=T)) ## sum of deletions and conversions ## convert NA to 0
   return(bed)}
 
 ctrl1 <- add_conv_to_bed(allbams%>%.[!grepl("RMD",.)],ctrl_red)
@@ -211,6 +224,8 @@ assign_regions <- function(bed,regions){
   return(bed)
 }
 
+load("data/bed_reduced_tmp.RData")
+
 ctrl2 <- assign_regions(ctrl1,myregions)
 rmd2 <- assign_regions(rmd1,myregions)
 
@@ -232,21 +247,33 @@ rmd2$target_group <- Hmisc::cut2(rmd2$sumDE,  cuts = mycuts)%>%gsub("\\[| ","",.
 ctrl2$score <- ctrl2$sumDE
 ctrl2$name2 <- ctrl2$name
 ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
+
+## for fair comparison of revision, keep thick as before (max)
+ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
+                                    ifelse(!is.na(ctrl2$thickTDMax),ctrl2$thickTDMax,
+                                           (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
+                       width=1)
 ## make "thick" point a max of TC (prioritize) or TD and if DEs are absent, just the middle of the cluster
 ## since the score is sum DE, it would also make sense to have sumDE as the thick point
 ## right now prioritize TC to TD, but should do the sum of both (in the function above)
-ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCSum),ctrl2$thickTCSum,
-                                    ifelse(!is.na(ctrl2$thickTDSum),ctrl2$thickTDSum,
-                                           (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
-                                    width=1)
+# ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCSum),ctrl2$thickTCSum,
+#                                     ifelse(!is.na(ctrl2$thickTDSum),ctrl2$thickTDSum,
+#                                            (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
+#                                     width=1)
 export.bed(ctrl2, "data/beds/CPEB4_Ctrl_hg19.bed")
 rmd2$score <- rmd2$sumDE
 rmd2$name2 <- rmd2$name
 rmd2$name <- paste(rmd2$name,rmd2$condition,sep="@")
-rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCSum),rmd2$thickTCSum,
-                                    ifelse(!is.na(rmd2$thickTDSum),rmd2$thickTDSum,
-                                           (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
-                       width=1)
+## old way
+rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCMax),rmd2$thickTCMax,
+                                   ifelse(!is.na(rmd2$thickTDMax),rmd2$thickTDMax,
+                                          (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
+                      width=1)
+## new way
+# rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCSum),rmd2$thickTCSum,
+#                                     ifelse(!is.na(rmd2$thickTDSum),rmd2$thickTDSum,
+#                                            (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
+#                        width=1)
 
 export.bed(rmd2, "data/beds/CPEB4_RMD_hg19.bed") 
 
