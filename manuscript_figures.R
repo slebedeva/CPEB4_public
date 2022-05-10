@@ -77,6 +77,8 @@ if(!file.exists("data/DEseq.RData")){source("Differential_expression_analysis.R"
 
 ############## load data ##############
 
+source("load_data.R")
+
 ## font size for plots
 global_size=14
 
@@ -180,32 +182,34 @@ save_plot("plots/Fig_4B.pdf",ppie)
 #myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
 
 ## gencode reduced 3'UTRs 
-myseq <- RNAStringSet(x = getSeq(red_3utrs,x=FaFile(hg19)))
-# myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
-# mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
-# forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
-
-## can also count in random 50 nt windows in UTRs
-## more correctly would be: in random windows taken by proportion of the regions same as CLIP (by count or length)
-## sample random substrings of red_utr sequences several times
-## because I have ~ 20,000 sites, need maybe ~40,000 windows (1 window per UTR, can repeat with different seed)
-## dt is faster (NEVER nested for loops in R!) 
-## also need UTRs longer that 50!
-seqdf=setDT(data.frame(seq=myseq, Width=width(myseq)) )[Width>50,]
-set.seed(2) ## can do it many times
-myw=25
-## make midpoints (sorry ugly code, do not remember how to row-wise in dt)
-seqdf[,midpt:=(lapply(seqdf$Width, function(x) sample(myw:(x-myw),1)) %>% unlist)]#sample(myw:(Width-myw),1)]
-## take random windows
-seqdf[,rw:=substring(seq,first = midpt-myw+1,last = midpt+myw)]
-#sanity check - should all be 50
-#lapply(seqdf$rw, stringr::str_length) %>% unique()
-## count kmers in those windows
-mywind=RNAStringSet(seqdf$rw)
+#load("annotation/myregions.RData")
 k=6
-myfreq <- oligonucleotideFrequency(mywind, width=k, step=1)
+myseq <- RNAStringSet(x = getSeq(red_3utrs,x=FaFile(hg19)))
+myfreq <- oligonucleotideFrequency(myseq, width=k, step=1) ##6mers
 mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
-forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
+forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
+
+# #### new, better way: can also count in random 50 nt windows in UTRs ####
+# ## more correctly would be: in random windows taken by proportion of the regions same as CLIP (by count or length)
+# ## sample random substrings of red_utr sequences several times
+# ## because I have ~ 20,000 sites, need maybe ~40,000 windows (1 window per UTR, can repeat with different seed)
+# ## dt is faster (NEVER nested for loops in R!) 
+# ## also need UTRs longer that 50!
+# seqdf=setDT(data.frame(seq=myseq, Width=width(myseq)) )[Width>50,]
+# set.seed(2) ## can do it many times
+# myw=25
+# ## make midpoints (sorry ugly code, do not remember how to row-wise in dt)
+# seqdf[,midpt:=(lapply(seqdf$Width, function(x) sample(myw:(x-myw),1)) %>% unlist)]#sample(myw:(Width-myw),1)]
+# ## take random windows
+# seqdf[,rw:=substring(seq,first = midpt-myw+1,last = midpt+myw)]
+# #sanity check - should all be 50
+# #lapply(seqdf$rw, stringr::str_length) %>% unique()
+# ## count kmers in those windows
+# mywind=RNAStringSet(seqdf$rw)
+# k=6
+# myfreq <- oligonucleotideFrequency(mywind, width=k, step=1)
+# mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
+# forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
 
 
 ## separate intronic and UTR regions
@@ -246,8 +250,8 @@ count_kmers <- function(myxl, k=6, mywindow=50){
   forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
   return(list(kmer_cnt=forgg,sequences=myseq))
 }
-forggc <- count_kmers(myxlc,k,mywindow)#Ctrl
-forggr <- count_kmers(myxlr,k,mywindow)#RMD
+# forggc <- count_kmers(myxlc,k,mywindow)#Ctrl
+# forggr <- count_kmers(myxlr,k,mywindow)#RMD
 
 ### split by UTR/intron (only pure annotations)
 #forggintc=count_kmers(subset(myxlc,region=="intron"),k,mywindow)
@@ -257,11 +261,15 @@ forggr <- count_kmers(myxlr,k,mywindow)#RMD
 #forgg5utrc=count_kmers(subset(myxlc,region=="5'UTR"),k,mywindow)
 #forgg5utrr=count_kmers(subset(myxlr,region=="5'UTR"),k,mywindow)
 
-## unite ctrl, rmd and background
-forggall <- forggc$kmer_cnt%>%
-  dplyr::full_join(forggr$kmer_cnt,by="kmer")%>%
-  dplyr::full_join(forgg,.,by="kmer")%>%set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+forgg3utrc=count_kmers(myxlc %>% .[grepl("3'UTR",.$region)],k,mywindow)
+forgg3utrr=count_kmers(myxlr %>% .[grepl("3'UTR",.$region)],k,mywindow)
+
+
+# ## unite ctrl, rmd and background
+# forggall <- forggc$kmer_cnt%>%
+#   dplyr::full_join(forggr$kmer_cnt,by="kmer")%>%
+#   dplyr::full_join(forgg,.,by="kmer")%>%set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+#   mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 
 ## use the same background count
 
@@ -273,11 +281,12 @@ forggall <- forggc$kmer_cnt%>%
 #  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 # 
 # ### 3UTR
-# forggall3utr <- forgg3utrc$kmer_cnt%>%
-#  dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
-#  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
-#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-#  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+forggall3utr <- forgg3utrc$kmer_cnt%>%
+ dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
+ dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+  set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
+ mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
+forggall=forggall3utr
 
 # ##5UTR
 # forggall5utr <- forgg5utrc$kmer_cnt%>%
@@ -530,8 +539,9 @@ rcasinputr=rmd2 %>% subsetByOverlaps(x = ., ranges = txdbFeatures$threeUTRs, typ
 #                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
 # dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[order(-.$score)] %>% .[1:10000]
 #                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
+
 ## only 3'UTR sites, plot windows around XL
-rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within")  %>% .[order(-.$score)] #%>% head(2000) ##%>% .[.$score>0]
+rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within")  %>% .[order(-.$score)] # %>% head(2000) ##%>% .[.$score>0]
 rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]# %>% head(2000)
 #rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc))  %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(4000)
 #rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[.$region=="3'UTR"]  %>% .[order(-.$score)] %>% head(4000)
@@ -543,15 +553,28 @@ rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetB
 #rcasinputc=myxlc  %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
 #rcasinputr=myxlr %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
 
-sampleN=min(length(rcasinputc),length(rcasinputr))
-sampleN
+#sampleN=min(length(rcasinputc),length(rcasinputr))
+#sampleN
 
+
+### !!! Bora said it is because UTRs are also different - of course!
+## me trying to change Boras code ( a little modified to include only within type ) - does not matter, use Boras code
+# common_utrs1=intersect(
+#   to(findOverlaps(rcasinputc, txdbFeatures$threeUTRs,type =  "within"))
+#   ,to(findOverlaps(rcasinputr, txdbFeatures$threeUTRs,type =  "within"))
+# )
+
+## Boras code
+## ! take care because you intersect UTRs to sites, not the other way around!!
+utrs <- txdbFeatures$threeUTRs
+common_utrs <- utrs[intersect(queryHits(findOverlaps(utrs, rcasinputc)),
+                              queryHits(findOverlaps(utrs, rcasinputr)))]
 dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc
-                                                , targetRegionsList = txdbFeatures[c("threeUTRs")]
+                                                , targetRegionsList = list('common'=common_utrs)#txdbFeatures[c("threeUTRs")]
                                                 #,sampleN = sampleN ## does not seem to work
                                                 )
 dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr
-                                                , targetRegionsList = txdbFeatures[c("threeUTRs")]
+                                                , targetRegionsList = list('common'=common_utrs)#txdbFeatures[c("threeUTRs")]
                                                 #,sampleN = sampleN
                                                 )
 
@@ -573,8 +596,16 @@ write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
 
 save_plot("plots/Fig_4C.pdf",rcaspl)
 
+### P.S. more analysis from Bora: of course, larger peaks will overlap more bins in each 3'UTR, so the coverage is higher
+df <- do.call(rbind, lapply(c(25, 50, 75, 100), function(w) {
+  message(w)
+  P <- RCAS::calculateCoverageProfileList(resize(ctrl, width = w), list('x' = common_utrs))
+  P$condition <- paste0("resized_to_", w)
+  return(P)
+}))
+plot_coverage(df)
 
-
+## of course, also the coverage profile changes: longer sites look more close to the 3'UTR end.
 
 #################### Fig 4F: distance to other RBPs ##################################
 
