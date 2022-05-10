@@ -3,6 +3,7 @@
 ## working dir is where this source file is
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
+message("your working directory is: ", getwd())
 
 ## important! otherwise Hs.org.db fails ##https://support.bioconductor.org/p/9136239/#9136319
 options(connectionObserver = NULL)
@@ -18,9 +19,10 @@ mypackages <- c("plyranges"
                 ,"Rsamtools"
                 ,"rio"
 )
-suppressPackageStartupMessages(lapply(mypackages, require, character.only=T))
+pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
+if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
 
-load("")
+#load("")
 hg19=("GRCh37.p13.genome.fa.bgz")
 
 ## we want to make bedgraph for plus and minus strand for each of the bam file with TC and Tdel
@@ -34,18 +36,20 @@ myseqinfo=Seqinfo(genome = "hg19")[canonical_chr]
 make_DE_bigwigs=function(bam, bed, myname){
   bed=rtracklayer::import(bed)
   ## make label
-  bed$which_label <- paste0(seqnames(bed),":",ranges(bed))
+  bed$which_label <- paste0(seqnames(bed),":",ranges(bed),":",strand(bed))
   p_param <- PileupParam(max_depth = 1e6) 
   sbp <- ScanBamParam(which = bed)
   mypile<-pileup(file = BamFile(bam), scanBamParam = sbp, pileupParam = p_param)
   
   ## how to handle NA? put to 0 counts 
   mypile[is.na(mypile)] <- 0
-  gr <- with(mypile, GRanges(seqnames=seqnames,ranges = IRanges(start=pos,width=1),strand = strand))
-  mypile$ref <- as.character(getSeq(x=FaFile(hg19), gr))
+  gr <- with(mypile, GRanges(seqnames=seqnames,ranges = IRanges(start=pos,width=1),strand = "+")) ## pileup always on plus!!
+  mypile$ref <- as.character(getSeq(x=FaFile(hg19), gr)) 
   
   ## need strand of the cluster
   bedstr=data.table(which_label=bed$which_label,bedstrand=as.character(strand(bed)))
+  ## fix label
+  mypile$which_label=paste(mypile$which_label,mypile$strand,sep=":")
   mypile$bedstrand=bedstr$bedstrand[match(mypile$which_label,bedstr$which_label)]
   
   #'TC'
@@ -65,6 +69,19 @@ make_DE_bigwigs=function(bam, bed, myname){
   TDgr$score=ifelse(TDs$strand=="+",TDs$count,-TDs$count)
   rtracklayer::export.bw(subset(TDgr,strand=="+"), paste0("data/bigwigs/",myname,"_Tdel.plus.bw"))
   rtracklayer::export.bw(subset(TDgr,strand=="-"), paste0("data/bigwigs/",myname,"_Tdel.minus.bw"))
+
+  # sum up for all DEs
+  mycols=c("seqnames","pos","strand","count")
+  setDT(TCs)
+  setDT(TDs)
+  DEs=rbind(TCs[, ..mycols],TDs[, ..mycols])[,.(sumDE=sum(count)),by=.(seqnames, pos, strand)]
+  DEgr <- suppressWarnings(
+    with(DEs, GRanges(seqnames=seqnames
+                      ,ranges = IRanges(start=pos,width=1)
+                      ,strand=strand, seqinfo = myseqinfo)))
+  DEgr$score=ifelse(DEs$strand=="+",DEs$sumDE,-DEs$sumDE)
+  rtracklayer::export.bw(subset(DEgr,strand=="+"), paste0("data/bigwigs/",myname,"_DEs.plus.bw"))
+  rtracklayer::export.bw(subset(DEgr,strand=="-"), paste0("data/bigwigs/",myname,"_DEs.minus.bw"))
 }
 
 ## ctrl
@@ -79,6 +96,7 @@ for(i in 1:length(CtrlBams)){
 RMDbams=allbams%>%.[grep("RMD",.)]
 mynames=RMDbams%>%sub("data/bams/","",.)%>%sub(".merged_uniq.bam","",.)
 for(i in 1:length(RMDbams)){
+  message("processing replicate.. ", i)
   make_DE_bigwigs(bed="data/beds/CPEB4_RMD_hg19.bed"
                   ,bam=RMDbams[i],myname = mynames[i])
 }
