@@ -4,24 +4,15 @@
 basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(basedir)
 message("your working directory is: ", getwd())
-
-## put plots separately in a folder
-plotdir <- file.path(basedir,"plots")
-if(! dir.exists(plotdir)){dir.create(plotdir)}
-## folder for source data
-datadir <- file.path(basedir,"data/source_data")
-if(! dir.exists(datadir)){dir.create(datadir)}
-
-
+message("your libraries are in: ", paste(.libPaths(), collapse = "; "))
 
 ###################################################### load environment ########################################################################################
 
 ## important! otherwise Hs.org.db fails ##https://support.bioconductor.org/p/9136239/#9136319
 options(connectionObserver = NULL)
-## where packages are
-.libPaths("/ohler/containers/CLIP_Rlibs/")
 
-mypackages <- c("plyranges"
+mypackages <- c("config"
+                ,"plyranges"
                 ,"tidyverse"
                 ,"reshape2"
                 ,"Hmisc"
@@ -65,22 +56,41 @@ if(length(to_install)>0){
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
 
+########## paths and directories ############
+
+## get values
+config=config::get()
+
+## make sure those directories exist
+plotdir=config$plotdir ##Plots
+datadir=config$datadir ##data
+ann_dir=config$ann_dir ##annotation
+scriptdir=config$scriptdir ##scripts
+resultdir=config$resultdir ## results
+for(mydir in c(ann_dir,plotdir,resultdir)){
+  if(!dir.exists(mydir)) {dir.create(mydir)}
+}
+
+## folder for R scripts
+## warning if cannot find scripts
+if(! dir.exists(scriptdir)){message("cannot find scripts, please check your scripts directory path in the config file!")}
+
+
 
 ############### generate data ###################
 
-ann_dir="./annotation"
-
-if(!file.exists("annotation/myregions.RData")){source("generate_annotation.R")}
-if(!file.exists("data/bed_reduced.RData")){source("process_CLIP_peaks.R")}
-if(!file.exists("data/DEseq.RData")){source("Differential_expression_analysis.R")}
+# important: they have to be executed in this order
+if(!file.exists(file.path(ann_dir,"myregions.RData"))){source(file.path(scriptdir,"generate_annotation.R"))}
+if(!file.exists(file.path(resultdir,"bed_reduced.RData"))){source(file.path(scriptdir,"process_CLIP_peaks.R"))}
+if(!file.exists(file.path(resultdir,"DEseq.RData"))){source(file.path(scriptdir,"Differential_expression_analysis.R"))}
 
 
 ############## load data ##############
 
-source("load_data.R")
+message("Loading data...")
 
 ## font size for plots
-global_size=14
+global_size=config$global_size
 
 ## custom color
 my_palette = c("grey10",RColorBrewer::brewer.pal(n = 9, "Blues")[2:7])
@@ -88,49 +98,43 @@ my_palette = c("grey10",RColorBrewer::brewer.pal(n = 9, "Blues")[2:7])
 ## define cut offs for target groups by diagnostic events
 mycuts=c(0,1,10,100,1000,5000)
 
-## get genome sequence (only once)
-if(!(file.exists("GRCh37.p13.genome.fa")|file.exists("GRCh37.p13.genome.fa.gz")|file.exists("GRCh37.p13.genome.fa.bgz"))){
-  system("wget http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/GRCh37.p13.genome.fa.gz")
-  system("gunzip -c GRCh37.p13.genome.fa.gz | bgzip  > GRCh37.p13.genome.fa.bgz")
-  }
-hg19=("GRCh37.p13.genome.fa.bgz")
-
-## annotation
-## get gencode v19 annotation data 
-load(file.path(ann_dir,"gtf.RData"))
+## genome
+hg19=config$genome
 
 ## transcript regions
 load(file.path(ann_dir,"myregions.RData"))
 
-
-
 ## merged CLIP peaks
-load("data/bed_reduced.RData") ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
-
+load(file.path(resultdir,"bed_reduced.RData")) ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
 
 ## import target genes
-load("data/target_genes.RData")
+load(file.path(resultdir,"target_genes.RData"))
 
-## differential expresison
-load("data/DEseq.RData") 
+## differential expression
+load(file.path(resultdir,"DEseq.RData")) 
 
 
 ## bam file list
-allbams <- list.files("data/bams", pattern = ".bam$", full.names = T)
+allbams <- list.files(file.path(datadir,"bams"), pattern = ".bam$", full.names = T)
 ## index bam (only once)
-if(!file.exists("data/bams/RMD2_CLIP.merged_uniq.bam.bai")){lapply(allbams,function(x) Rsamtools::indexBam(x))}
+if(!file.exists(paste0(allbams[[1]],".bai"))){lapply(allbams,function(x) Rsamtools::indexBam(x))}
 
 ### get ARE and IEG gene databases
 
-## add AREs 
-if(!file.exists("Complete 3 UTR Data.xls")){
+## add AREs (unrar is difficult so I just provide this)
+if(!file.exists(file.path(datadir,"Complete 3 UTR Data.xls"))){
   system("wget https://brp.kfshrc.edu.sa/ared/Content/Uploads/Complete%203%20UTR%20ARE%20Data.rar") 
   system("unrar e Complete\ 3\ UTR\ ARE\ Data.rar") ## need to install it on a container
+  system("mv Complete\ 3\ UTR\ ARE\ Data.rar data/")
 }
-AREdb=rio::import('Complete 3 UTR Data.xls')
+AREdb=rio::import(file.path(datadir,'Complete 3 UTR Data.xls'))
 
 ## add fantom IEG 
-fantom_ieg=rio::import("https://ndownloader.figshare.com/files/3263948", skip=1)%>%dplyr::slice(1:232)
+if(!file.exists(file.path(datadir,"FANTOM_IEGs.csv"))){
+  fantom_ieg=rio::import("https://ndownloader.figshare.com/files/3263948", skip=1)%>%dplyr::slice(1:232)
+  write.csv(fantom_ieg, file=file.path(datadir,"FANTOM_IEGs.csv"), row.names = F)
+}
+fantom_ieg=read.csv(file.path(datadir,"FANTOM_IEGs.csv"))
 
 ##clean up 
 if(file.exists("wget-log")){system("rm wget-log*")}
@@ -167,60 +171,24 @@ ppie <-
 
 ppie
 
-write_csv(mypie, file = "data/source_data/Fig_4B.csv")
+write_csv(mypie, file = file.path(resultdir,"Fig_4B.csv"))
 
-save_plot("plots/Fig_4B.pdf",ppie)
+save_plot(file.path(plotdir,"Fig_4B.pdf"),ppie)
+
+gc()
 
 ################# 4D: scatterplot of motif counts #################################
 
-### calculate background: what is kmer count in all UTRs?
-## use reduced UTRs to avoid double counting same sequence
+## main figure: kmer count
 
-## OK my background is 3UTRs and I count kmers in everything... 
- 
-## ncbi UTR
-#myseq <- RNAStringSet(x = getSeq(red_utrs,x=FaFile(hg19)))
+### calculate background: what is kmer count in all 3UTRs?
+## use gencode reduced 3UTRs to avoid double counting same sequence
+k=6 # count 6-mers having in mind AAUAAA
 
-## gencode reduced 3'UTRs 
-#load("annotation/myregions.RData")
-k=6
 myseq <- RNAStringSet(x = getSeq(red_3utrs,x=FaFile(hg19)))
 myfreq <- oligonucleotideFrequency(myseq, width=k, step=1) ##6mers
 mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
 forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
-
-# #### new, better way: can also count in random 50 nt windows in UTRs ####
-# ## more correctly would be: in random windows taken by proportion of the regions same as CLIP (by count or length)
-# ## sample random substrings of red_utr sequences several times
-# ## because I have ~ 20,000 sites, need maybe ~40,000 windows (1 window per UTR, can repeat with different seed)
-# ## dt is faster (NEVER nested for loops in R!) 
-# ## also need UTRs longer that 50!
-# seqdf=setDT(data.frame(seq=myseq, Width=width(myseq)) )[Width>50,]
-# set.seed(2) ## can do it many times
-# myw=25
-# ## make midpoints (sorry ugly code, do not remember how to row-wise in dt)
-# seqdf[,midpt:=(lapply(seqdf$Width, function(x) sample(myw:(x-myw),1)) %>% unlist)]#sample(myw:(Width-myw),1)]
-# ## take random windows
-# seqdf[,rw:=substring(seq,first = midpt-myw+1,last = midpt+myw)]
-# #sanity check - should all be 50
-# #lapply(seqdf$rw, stringr::str_length) %>% unique()
-# ## count kmers in those windows
-# mywind=RNAStringSet(seqdf$rw)
-# k=6
-# myfreq <- oligonucleotideFrequency(mywind, width=k, step=1)
-# mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
-# forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
-
-
-## separate intronic and UTR regions
-# kmer_list=list()
-# for(region in c("3'UTR","intron")){
-#   myseq <- RNAStringSet(x = getSeq(reduce_ranges(subset(myregions,region==region)),x=FaFile(hg19)))
-#   myfreq <- oligonucleotideFrequency(myseq, width=6, step=1) ##6mers
-#   mykmercount <- colSums(myfreq)%>%sort(decreasing=T)
-#   kmer_list[[region]] <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")
-# }
-# 
 
 ###make granges for crosslink centers ("thick" position= highest DE per cluster per rep)
 ## not filtered out sites with 0 DEs - their center is just middle point ##
@@ -237,9 +205,7 @@ myxlr <- GRanges(seqnames = rmd2@seqnames,
                  name=rmd2$name,
                  score=rmd2$score)
 
-
-## main figure: kmer count
-#k=6 # count 6-mers having in mind AAUAAA
+## choose window size
 mywindow=50
 ## the window is asymmetrical because the last 6-mer will fit on position 45:50 
 count_kmers <- function(myxl, k=6, mywindow=50){
@@ -250,150 +216,83 @@ count_kmers <- function(myxl, k=6, mywindow=50){
   forgg <- mykmercount%>%as.data.frame%>%rownames_to_column(var="kmer")#%>%mutate(kmer=factor(kmer,levels=kmer))
   return(list(kmer_cnt=forgg,sequences=myseq))
 }
-# forggc <- count_kmers(myxlc,k,mywindow)#Ctrl
-# forggr <- count_kmers(myxlr,k,mywindow)#RMD
 
-### split by UTR/intron (only pure annotations)
-#forggintc=count_kmers(subset(myxlc,region=="intron"),k,mywindow)
-#forgg3utrc=count_kmers(subset(myxlc,region=="3'UTR"),k,mywindow)
-#forggintr=count_kmers(subset(myxlr,region=="intron"),k,mywindow)
-#forgg3utrr=count_kmers(subset(myxlr,region=="3'UTR"),k,mywindow)
-#forgg5utrc=count_kmers(subset(myxlc,region=="5'UTR"),k,mywindow)
-#forgg5utrr=count_kmers(subset(myxlr,region=="5'UTR"),k,mywindow)
-
+### only count in 3'UTR overlapping sites 
 forgg3utrc=count_kmers(myxlc %>% .[grepl("3'UTR",.$region)],k,mywindow)
 forgg3utrr=count_kmers(myxlr %>% .[grepl("3'UTR",.$region)],k,mywindow)
 
 
 # ## unite ctrl, rmd and background
-# forggall <- forggc$kmer_cnt%>%
-#   dplyr::full_join(forggr$kmer_cnt,by="kmer")%>%
-#   dplyr::full_join(forgg,.,by="kmer")%>%set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-#   mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
-
-## use the same background count
-
-##intron
-# forggallint <- forggintc$kmer_cnt%>%
-#  dplyr::full_join(forggintr$kmer_cnt,by="kmer")%>%
-#  dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$intron
-#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-#  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
-# 
-# ### 3UTR
-forggall3utr <- forgg3utrc$kmer_cnt%>%
+# ### 3UTR only
+forggall <- forgg3utrc$kmer_cnt%>%
  dplyr::full_join(forgg3utrr$kmer_cnt,by="kmer")%>%
- dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
+ dplyr::full_join(forgg,.,by="kmer")%>% 
   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
  mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
-forggall=forggall3utr
 
-# ##5UTR
-# forggall5utr <- forgg5utrc$kmer_cnt%>%
-#   dplyr::full_join(forgg5utrr$kmer_cnt,by="kmer")%>%
-#   dplyr::full_join(forgg,.,by="kmer")%>% #kmer_list$`3'UTR`
-#   set_colnames(c("kmer","UTR","DMSO","RMD"))%>%
-#   mutate(DMSO_ratio=DMSO/UTR,RMD_ratio=RMD/UTR)%>%arrange(desc(DMSO_ratio),desc(RMD_ratio))
 
-## highlight CPE but because we use 6-mers we need all substrings of length 6 that fit into canonical 7-mer UUUUUAU (and others)
-allsubstr <- function(x, n) unique(substring(x, 1:(nchar(x) - n + 1), n:nchar(x)))## generate all substrings of length n: stolen https://stackoverflow.com/a/35561930
+## highlight CPE 
+## because we use 6-mers we need all substrings of length 6 that fit into canonical 7-mer UUUUUAU (and others)
+allsubstr <- function(x, n) unique(substring(x, 1:(nchar(x) - n + 1), n:nchar(x))) ## generate all substrings of length n: from https://stackoverflow.com/a/35561930
 ## CPE consensus: http://genesdev.cshlp.org/content/28/13/1498.full "UUUUA1–2U" or "UUUUUAU" or UUUUAACA https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1817753/ 
 ##Mendez has even more: TTTTAT’, ‘TTTTAAT’, ‘TTTTAAAT’, ‘TTTTACT’, ‘TTTTCAT’, ‘TTTTAAGT’, ‘TTTTGT #https://www.biorxiv.org/content/10.1101/2021.03.11.434803v1.full
 CPEs=c(allsubstr("UUUUUAU",6), allsubstr("UUUUAAU",6), allsubstr("UUUUAAAU",6) ##more canonical
        #,allsubstr("UUUUAACA",6), allsubstr("UUUUACU",6),  allsubstr("UUUUCAU",6), allsubstr("UUUUAAGU",6), allsubstr("UUUUGU",6) ##less canonical with CG
 )
 forggall$canonical_CPE<-forggall$kmer%in%CPEs
-## what to label all CPE plus top nonCPE:
+
+## what to label: all CPE plus top nonCPE:
 ## just plot counts normalized to general UTR abundance
-## ranking should be both for dmso and rmd of course
+## ranking should be both for dmso and rmd
 cpes=subset(forggall,canonical_CPE)
-#topkmers=subset(forggall,!canonical_CPE & (DMSO_ratio > 0.08 & RMD_ratio > 0.04))
-## because the ratio will change, let us take top 10 or 20 motifs
-mytop=10
-plotkmer=function(forggall){
+## highlight top N motifs
+mytop=20
+plotkmer=function(forggall,mytop=20){
   # k-mers to highlight
   topkmersc=forggall%>%arrange(desc(DMSO_ratio)) %>% .[!.$canonical_CPE,] %>% head(mytop) 
   topkmersr=forggall%>%arrange(desc(RMD_ratio)) %>% .[!.$canonical_CPE,] %>% head(mytop) 
   topkmers=rbind(topkmersc,topkmersr) %>% unique()
-  
-  g=ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+geom_point(col=rgb(.5,.5,.5,.5)) + 
-    theme_classic(base_size = global_size) + #rgb(.5,.5,.5,.5) ##eps cannot transparency ##col="grey70",shape=1
-    geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-    geom_text_repel(data = subset(forggall,kmer%in%CPEs), aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-    geom_point(data = topkmers, aes(col="black")) +
-    geom_point(data = subset(forggall,canonical_CPE), col="darkred")+
-    labs(x="normalized 6-mer count, DMSO", y="normalized 6-mer count, RMD") + scale_color_manual(values = c("black","darkred")) +
-    theme(legend.position = "None") +
-    draw_label(label = "canonical CPEs", x = 7000, y = 500, color = "darkred",hjust = 0,size = 10) +
+  ## color A- and U-rich differently (demand > 4 As/Us in the top N to be "rich")
+  Arich=topkmers[which( (topkmers$kmer %>% str_count(.,"A") ) >=4 ),]
+  Urich=topkmers[which( (topkmers$kmer %>% str_count(.,"U") ) >=4 ),]
+  cpes=subset(forggall,canonical_CPE)
+  g=
+    ggplot(forggall,aes(DMSO_ratio,RMD_ratio))+
+    geom_point(col=rgb(.5,.5,.5,.5)) + 
+    theme_classic(base_size = global_size) + 
+    geom_text_repel(data = cpes, aes(label=kmer), col="darkblue",max.overlaps = Inf,force = 40,force_pull=0,direction = "both", nudge_y = -0.01) +
+    geom_text_repel(data = Urich, aes(label=kmer), col="darkred",max.overlaps = Inf,force = 40,force_pull=0,direction = "both", nudge_x = -0.03) +
+    geom_text_repel(data = Arich, aes(label=kmer), col="darkgreen",max.overlaps = Inf,force = 40,force_pull=0,direction = "both", nudge_x = 0.03) +
+    geom_point(data = cpes, col="darkblue") +
+    geom_point(data = Urich, col="darkred") +
+    geom_point(data = Arich, col="darkgreen") +
+    labs(title="6-mer counts in 3'UTR", x="normalized 6-mer count, 3'UTR, DMSO", y="normalized 6-mer count, 3'UTR, RMD") + 
+    #scale_color_manual(""
+    #                   , values = c("darkblue"
+    #                                , "darkred"
+    #                                ,"darkgreen"
+    #                                )
+    #                   , labels=c("CPEs"
+    #                              ,"U-rich"
+    #                              ,"A-rich"
+    #                              )
+    #                   ) +
+    #theme(legend.position = "None") +
     theme(aspect.ratio=1) + ##square plot
     NULL
   print(g)
   return(g)
 }
 
-ggkmer <- plotkmer(forggall)
-
+ggkmer <- plotkmer(forggall,mytop=mytop)
 ggkmer
-   
-write_csv(forggall,file="data/source_data/Fig_4D.csv")
 
-save_plot("plots/Fig_4D.pdf",ggkmer)
+gc()
 
+write_csv(forggall,file=file.path(resultdir,"Fig_4D.csv"))
 
-## add pseudocounts (does not help)
+save_plot(file.path(plotdir,"Fig_4D.pdf"),ggkmer)
 
-# forggall %<>%
-#   mutate(UTRp=UTR+10, DMSOp=DMSO+10, RMDp=RMD+10) %>%
-#   mutate(DMSO_ratio_p=DMSOp/UTRp,RMD_ratio_p=RMDp/UTRp)
-# 
-# ggplot(forggall,aes(DMSO_ratio_p,RMD_ratio_p))+geom_point(col=rgb(.5,.5,.5,.5)) +
-#   theme_classic(base_size = global_size) +
-#   #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-#   #geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-#   #geom_point(data = topkmers, aes(col="black")) +
-#   #geom_point(data = cpes, aes(col="darkred")) +
-#   geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03)  +
-#   labs(x="normalized 6-mer count+10, DMSO", y="normalized 6-mer count+10, RMD") +
-#   scale_color_manual(values = c("black","darkred")) +
-#   theme(legend.position = "None") +
-#   theme(aspect.ratio=1) + ##square plot
-#   NULL
- 
-
-## try log counts on top of pseudocounts (why did I not think of this before?)
-## this helps a bit 
-
-# forggall %<>%
-#   mutate(UTRp=log(UTR+10), DMSOp=log(DMSO+10), RMDp=log(RMD+10),DMSOr=DMSOp-UTRp,RMDr=RMDp-UTRp) 
-#   ggplot(forggall,aes(DMSOr,RMDr))+geom_point(col=rgb(.5,.5,.5,.5)) +
-#     theme_classic(base_size = global_size) +
-#     #geom_text_repel(data = topkmers, aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03) +
-#     #geom_text_repel(data = cpes, aes(label=kmer, col="darkred"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_y = -0.01) +
-#     #geom_point(data = topkmers, aes(col="black")) +
-#     #geom_point(data = cpes, aes(col="darkred")) +
-#     geom_text_repel(data = head(forggall,20), aes(label=kmer, col="black"),max.overlaps = Inf,force = 4,force_pull=0.05,direction = "both", nudge_x = -0.03)  +
-#     #labs(x="normalized 6-mer count+10, DMSO", y="normalized 6-mer count+10, RMD") +
-#     #scale_color_manual(values = c("black","darkred")) +
-#     theme(legend.position = "None") +
-#     theme(aspect.ratio=1) + ##square plot
-#     NULL
-
-
-## ask which sites are with GC (both intron and UTR sites are fine)
-
-
-# plotkmer(forggallint)
-# plotkmer(forggall3utr)
-# plotkmer(forggall5utr)
-
-
-## where the GC comes from - compare ctrl and rmd
-# myxl_cond <- plyranges::mutate(width = mywindow, anchor_center(myxlc)) ## make crosslink centered regions of 50nt (xl will be 25)
-# myseq <- RNAStringSet(x = getSeq(myxl_cond,x=FaFile(hg19)))
-# myfreq <- oligonucleotideFrequency(myseq, width=k, step=1)
-# par(mar=c(10,3,3,3))
-# myxl_cond[myfreq[,"CGGCGG"]>0] %>% .$region %>% factor %>% summary %>% barplot(las=2)
-## Ctrl: intron and 5'UTR, RMD: intron mostly, so these come from the few 5'UTR sites
 
 
 #################### Fig 4E:  heatmap for top 100 motifs ########################
@@ -434,8 +333,8 @@ make_kmer_matrix <- function(kmer_cnt, myseqs, mytopN=100, k=6, mywindow=50){
 ## we can keep it as it is (and then try to find a U-mer first, and then distance to A-mer in this cluster)
 ## alternatively we filter only sites that have a crosslink event
 
-kmersc <- make_kmer_matrix(kmer_cnt = forggc$kmer_cnt, myseqs = forggc$sequences, mytopN = mytopN, k = k, mywindow = mywindow)
-kmersr <- make_kmer_matrix(kmer_cnt = forggr$kmer_cnt, myseqs = forggr$sequences, mytopN=mytopN, k=k, mywindow = mywindow)
+kmersc <- make_kmer_matrix(kmer_cnt = forgg3utrc$kmer_cnt, myseqs = forgg3utrc$sequences, mytopN = mytopN, k = k, mywindow = mywindow)
+kmersr <- make_kmer_matrix(kmer_cnt = forgg3utrr$kmer_cnt, myseqs = forgg3utrr$sequences, mytopN=mytopN, k=k, mywindow = mywindow)
 
 
 ## heatmap and cluster motif logos (use 2 clusters)
@@ -498,85 +397,33 @@ fullheatc=plot_grid(pwmc,heatc, rel_widths = c(1,3))
 
 fullheatc
 
-### source data provided as unscaled score matrix with cluster number
-write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster), file="data/source_data/Fig_4E.csv")
 
-save_plot("plots/Fig_4E.pdf",fullheatc)
+
+### source data provided as unscaled score matrix with cluster number
+write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster),
+          file=file.path(resultdir,"Fig_4E.csv"))
+
+save_plot(file.path(plotdir,"Fig_4E.pdf"),fullheatc)
 
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 
-## annotation
-
-#gtf <- rtracklayer::import(con = "gencode.v19.annotation.gtf.gz")
-
-## create features list which is needed as input to the RCAS function
-if(!file.exists(file.path(ann_dir,"txdbFeatures.RData"))){
-  txdbFeatures <- RCAS::getTxdbFeaturesFromGRanges(gtf)
-  save(txdbFeatures, file=file.path(ann_dir,"txdbFeatures.RData"))
-}
 load(file.path(ann_dir,"txdbFeatures.RData"))
-
 
 ## only 3UTR is informative so plot only this 
 ## restrict to 5,000 examples to speed up
-# dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = ctrl2%>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
-# , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-# dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rmd2%>% .[grepl("3'UTR",.$region)] %>% .[order(-.$score)] %>% .[1:5000]
-# , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-# original sites
-rcasinputc=ctrl2  %>% subsetByOverlaps(x = ., ranges = txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)] %>% head(5000)
-rcasinputr=rmd2 %>% subsetByOverlaps(x = ., ranges = txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)] %>% head(5000)
-#rcasinputc=ctrl2  %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(4000)
-#rcasinputr=rmd2 %>% .[.$region=="3'UTR"]  %>% .[order(-.$score)] %>% head(4000)
-
-
-
 ## plot windows of the same size around croslsink center instead of actual bed peaks
-## the sequence is included in the objects above when I counted k-mers %>% 
-## this still does not make it equal - maybe because it randomly selects from more sites?
-# dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% .[order(-.$score)] %>% .[1:10000]
-#                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-# dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[order(-.$score)] %>% .[1:10000]
-#                                                 , targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-
 ## only 3'UTR sites, plot windows around XL
-rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within")  %>% .[order(-.$score)] # %>% head(2000) ##%>% .[.$score>0]
-rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]# %>% head(2000)
-#rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc))  %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(4000)
-#rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% .[.$region=="3'UTR"]  %>% .[order(-.$score)] %>% head(4000)
-
-## only crosslinks (also not equal)
-#dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions = myxlc, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-#dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = myxlr, targetRegionsList = txdbFeatures[c("threeUTRs")], sampleN = 10000)
-#just crosslinks
-#rcasinputc=myxlc  %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
-#rcasinputr=myxlr %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]
-
-#sampleN=min(length(rcasinputc),length(rcasinputr))
-#sampleN
-
-
-### !!! Bora said it is because UTRs are also different - of course!
-## me trying to change Boras code ( a little modified to include only within type ) - does not matter, use Boras code
-# common_utrs1=intersect(
-#   to(findOverlaps(rcasinputc, txdbFeatures$threeUTRs,type =  "within"))
-#   ,to(findOverlaps(rcasinputr, txdbFeatures$threeUTRs,type =  "within"))
-# )
+rcasinputc=plyranges::mutate(width = mywindow, anchor_center(myxlc)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within")  %>% .[order(-.$score)]  %>% head(5000) 
+rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetByOverlaps(txdbFeatures$threeUTRs, type = "within") %>% .[order(-.$score)]  %>% head(5000)
 
 ## Boras code
 ## ! take care because you intersect UTRs to sites, not the other way around!!
 utrs <- txdbFeatures$threeUTRs
 common_utrs <- utrs[intersect(queryHits(findOverlaps(utrs, rcasinputc)),
                               queryHits(findOverlaps(utrs, rcasinputr)))]
-dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc
-                                                , targetRegionsList = list('common'=common_utrs)#txdbFeatures[c("threeUTRs")]
-                                                #,sampleN = sampleN ## does not seem to work
-                                                )
-dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr
-                                                , targetRegionsList = list('common'=common_utrs)#txdbFeatures[c("threeUTRs")]
-                                                #,sampleN = sampleN
-                                                )
+dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc, targetRegionsList = list('common'=common_utrs))
+dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr, targetRegionsList = list('common'=common_utrs))
 
 dcvgListc$condition="DMSO"
 dcvgListr$condition="RMD"
@@ -592,20 +439,11 @@ rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage
   NULL
 rcaspl
 
-write_csv(rbind(dcvgListc,dcvgListr), file="data/source_data/Fig_4C.csv")
+write_csv(rbind(dcvgListc,dcvgListr), file=file.path(resultdir,"Fig_4C.csv"))
 
-save_plot("plots/Fig_4C.pdf",rcaspl)
+save_plot(file.path(plotdir,"Fig_4C.pdf"),rcaspl)
 
-### P.S. more analysis from Bora: of course, larger peaks will overlap more bins in each 3'UTR, so the coverage is higher
-df <- do.call(rbind, lapply(c(25, 50, 75, 100), function(w) {
-  message(w)
-  P <- RCAS::calculateCoverageProfileList(resize(ctrl, width = w), list('x' = common_utrs))
-  P$condition <- paste0("resized_to_", w)
-  return(P)
-}))
-plot_coverage(df)
-
-## of course, also the coverage profile changes: longer sites look more close to the 3'UTR end.
+gc()
 
 #################### Fig 4F: distance to other RBPs ##################################
 
@@ -613,7 +451,7 @@ plot_coverage(df)
 cpeb4 <- ctrl2
 cpeb4$name <- "CPEB4"
 ##import rest of RBP
-helas <- rtracklayer::import("data/beds/all_HeLa_RBPs.bed") ## pre-merged HeLa CLIP peaks
+helas <- rtracklayer::import(file.path(datadir,"beds/all_HeLa_RBPs.bed")) ## pre-merged HeLa CLIP peaks
 helas$name <- sub("_.+","",helas$name)
 ## important: remove EWSR because it is still not published
 helas%<>%.[.$name!="EWS"]
@@ -676,9 +514,9 @@ pabpdistPlot <-
 pabpdistPlot
 
 ## source data
-mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file="data/source_data/Fig_4F.csv")
+mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file=file.path(resultdir,"Fig_4F.csv"))
 
-save_plot("plots/Fig_4F.pdf",pabpdistPlot)
+save_plot(file.path(plotdir,"Fig_4F.pdf"),pabpdistPlot)
 
 ########### Fig 5 ##########
 
@@ -716,7 +554,7 @@ fab_half <- hlraw%>%
 
 ### source data
 
-write_csv(fab_half, file="data/source_data/Fig_5DE_S7C.csv")
+write_csv(fab_half, file=file.path(resultdir,"Fig_5DE_S7C.csv"))
 
 
 ##################### 5A: violin plots for half-lives ###################
@@ -745,9 +583,9 @@ phl <-
 
 phl
 
-write_csv(hl2, file = "data/source_data/Fig_5A.csv")
+write_csv(hl2, file = file.path(resultdir,"Fig_5A.csv"))
 
-save_plot("plots/Fig_5A.pdf",phl)
+save_plot(file.path(plotdir,"Fig_5A.pdf"),phl)
 
 ##################### 5D: ecdf for IEGs #####################
 
@@ -763,9 +601,10 @@ ggsiIEG <-
   NULL
 ggsiIEG
 
-save_plot("plots/Fig_5D.pdf",ggsiIEG)
+save_plot(file.path(plotdir,"Fig_5D.pdf"),ggsiIEG)
 
 ################### 5E: ecdf for target groups #################
+fab_half$target_group=relevel(fab_half$target_group, ref = "nontarget")
 
 ggsimean <- 
   ggplot(fab_half, aes(meanlogFC_DMSO, col=target_group)) +
@@ -779,7 +618,7 @@ ggsimean <-
   NULL
 ggsimean
 
-save_plot("plots/Fig_5E.pdf",ggsimean)
+save_plot(file.path(plotdir,"Fig_5E.pdf"),ggsimean)
 
 #################### 5F: GSEA plot ################################
 
@@ -838,9 +677,9 @@ gsea_df$leadingEdge=unlist(lapply(fgseaRes$leadingEdge,function(x) paste(x,colla
 
 ggsea
 
-write_csv(gsea_df%>%.[order(.$padj),], file="data/source_data/Fig_5F.csv")
+write_csv(gsea_df%>%.[order(.$padj),], file=file.path(resultdir,"Fig_5F.csv"))
 
-save_plot("plots/Fig_5F.pdf",ggsea)
+save_plot(file.path(plotdir,"Fig_5F.pdf"),ggsea)
 
 ################################ 5G: example genome browser shots #############################################
 
@@ -858,21 +697,6 @@ options(ucscChromosomeNames=FALSE)
 #library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
 sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
 
-## clip tracks
-cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
-                              #,stacking = "hide"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              , referenceSequence=sTrack
-)
-cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              , referenceSequence=sTrack
-)
-
-#rename tracks easily
-#cliptrack1@name <- "CLIP r1"
-#cliptrack2@name <- "CLIP r2"
-
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
 mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
@@ -885,75 +709,152 @@ grtrack <- GeneRegionTrack(
   ,fontfamily.title = myfont 
 )
 
+## CLIP coverage from bam
+cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+                              ,col.deletion="darkred"
+)
+cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+)
+
+## CLIP coverage and diagnostic events tracks from bigwig
+DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_DEs.plus.bw")
+                      , genome = "hg19"
+                      ,type="histogram"
+                      ,name = "DEs p32"
+                      ,col.histogram = "darkblue")
+
+DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
+                      , genome = "hg19"
+                      ,type="histogram"
+                      ,name = "DEs ir")
+
+covTrack1=DataTrack(range=file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
+                    , genome = "hg19"
+                    ,type="s"
+                    ,name = "coverage p32")
+
+covTrack2=DataTrack(range=file.path(datadir,"bigwigs","Ctrl1_CLIP_fwd.bw")
+                    , genome = "hg19"
+                    ,type="s"
+                    ,name = "coverage ir")
+
+
+## overlay conversions and coverage (the scale is not the same!!!)
+
+ot1 <- OverlayTrack(trackList=list(cliptrack1,DEtrack1), name="coverage and DEs p32") ## coverage from bam does not show deletions
+
+ot2 <- OverlayTrack(trackList=list(DEtrack1, covTrack1), name="coverage and DEs ir")
+
 
 ## need JUNB,FOS,EGR1
+goi=c("EGR1","FOS","JUNB")
+
+## smaller track with only intereting genes
+load(file.path(ann_dir,"gtf.RData"))
+smTxdb=makeTxDbFromGRanges(subset(gtf, gene_name%in%goi))
+smgrtrack <- GeneRegionTrack(
+  smTxdb
+  , fill="darkblue"
+  , collapseTranscripts="longest" ## show "meta" transcript to save space
+  ,fontfamily = myfont 
+  ,fontfamily.group = myfont 
+  ,fontfamily.title = myfont 
+)
+
+
 # just look up coordinates by hand
-mygenes <- data.frame(row.names = c("EGR1","FOS","JUNB"),
-                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
+ylims=c(10,50,300) ## set up manually
+
+mygenes <- data.frame(row.names = goi,
+                      gene=factor(goi,levels=c("EGR1","FOS","JUNB")),
                       chr=c("chr5","chr14","chr19"),
                       afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204))
+                      ato=c(137805547,75749523,12905204),
+                      ylims=ylims)
+
 igvs <- 
-  xyplot(1 ~ gene | gene, data = 
-           data.frame(row.names = c("EGR1","FOS","JUNB"),
-                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
-                      chr=c("chr5","chr14","chr19"),
-                      afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204)), #par.settings=list(axis.text=list(fontfamily="Comic Sans MS")),
-         panel = function(x) {
+  xyplot(1 ~ gene | gene, data = mygenes,
+          panel = function(x) {
            afrom=mygenes$afrom[x]
            ato=mygenes$ato[x]
            chr=mygenes$chr[x]
-           plotTracks(c(cliptrack1 ,cliptrack2, grtrack),from = afrom,to = ato,chromosome = chr,type="coverage",showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             #ot1 #, ot2
+             cliptrack1
+             ,cliptrack2,smgrtrack),from = afrom,to = ato,chromosome = chr
+                      #,ylim=c(0,ylim)
+                      #,type="coverage"
+             ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
                       main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
          }
          , layout=c(3,1)
          , scales = list(draw = FALSE)
          , xlab = NULL, ylab = NULL)
 ## be careful! if not full screen there wont be enough place and will get weird viewport error
+igvs
 
 fig5g=plot_grid(igvs)
 
 fig5g
 
-save_plot("plots/Fig_5G.pdf",fig5g)
+save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
 
 ### new panel to zoom in
 
-## need bed track
+## make new zoomed in coordinates
+for(mygene in goi){
+  ## get highest scoring cluster
+  myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
+  #chr=seqnames(myclus)@values
+  ## plot not cluster borders, but a window around crosslink
+  mywindow=100
+  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
+  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
+  
+}
 
+igvs2 <- 
+  xyplot(1 ~ gene | gene, data = mygenes,
+         panel = function(x) {
+           afrom=mygenes$afrom2[x]
+           ato=mygenes$ato2[x]
+           chr=mygenes$chr[x]
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             ot1 
+             #ot2
+             #,cliptrack1
+             #,cliptrack2,
+             #,DEtrack1
+             #,covTrack1
+             , smgrtrack
+             , sTrack
+             ),from = afrom,to = ato,chromosome = chr
+             ,ylim=c(0,ylim)
+             #,type="coverage"
+             ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(2,.1,.1),
+             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+         }
+         , layout=c(1,3)
+         , scales = list(draw = FALSE)
+         , xlab = NULL, ylab = NULL)
+
+igvs2
+
+fig_5g_suppl=plot_grid(igvs2)
+
+fig_5g_suppl
+
+save_plot(file.path(plotdir,"Fig_5G_suppl.pdf"),base_asp = .8, base_height = 16,  fig_5g_suppl)
 
 ########### Fig S5 ##########
-
-################# S5B,C: CLIP gel images #################
-
-# ## add CLIP gel images
-# p32 <- "data/gels/p32_clip_fabian_annotated.png"
-# p32_panel <- ggdraw() + draw_image(p32, scale = 0.8)
-# ir <- "data/gels/20200820-100605_irCLIP_crop.png"
-# ir_panel <- ggdraw() + draw_image(ir, scale = .5, x = -.1)
-# #annotate irCLIP figure
-# ir_anno <-
-#   ir_panel +
-#   draw_line(x = c(.4,.6),y=.75) +
-#   draw_label("3xF-CPEB4", size = 18, x = .5, y = .8) +
-#   ## NIR ladder 70, 95, 130, 250 Thermo #26635
-#   draw_label("NIR", size = 17, x = .23, y = .75) +
-#   draw_label("70", size = 14, x = .1, y = .3) +
-#   draw_label("95", size = 14, x = .1, y = .41) +
-#   draw_label("130", size = 14, x = .1, y = .52) +
-#   draw_label("250", size = 14, x = .1, y = .63) +
-#   ## annotate bands with adapters
-#   draw_label("CPEB4:RNA:1 adapter", size = 10, x = .67, y = .51, hjust = 0) +
-#   draw_line(x = .66, y = c(.54,.48)) +
-#   draw_label("CPEB4:RNA:2 adapters", size = 10, x = .67, y = .57, hjust = 0) +
-#   draw_line(x = .66, y = c(.55,.59)) +
-#   NULL
-# 
-# options(digits = 3, scipen = -2) #for consistent notation
-# blots=plot_grid(p32_panel,ir_anno,labels = "AUTO", scale = .7)
-# 
-# save_plot("plots/Fig_S5BC.pdf",blots)
 
 #################### S5D: pairs plot for CLIP replicates ###################
 
@@ -977,17 +878,21 @@ colnames(logCnt)%<>%paste0(.,"_log10_p1")
 
 ## record plots as objects for ctrl and RMD
 plot.new()
-pairs(logCnt%>%.[,1:3], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
+pairs(logCnt%>%.[,!grepl("RMD",colnames(.))], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE
+      , labels = ifelse( grepl("CPEB4_",colnames(logCnt)%>%.[!grepl("RMD",.)]), "p32","ir" )
+      )
 p_repr_c <- recordPlot()
 plot.new()
-pairs(logCnt%>%.[,4:6], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
+pairs(logCnt%>%.[,grepl("RMD",colnames(.))], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE
+      , labels = ifelse( grepl("CPEB4_",colnames(logCnt)%>%.[grepl("RMD",.)]), "p32","ir" )
+        )
 p_repr_r <- recordPlot() 
 
 write.csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
 
-save_plot("plots/Fig_S5D.pdf",plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
+save_plot(file.path(plotdir,"Fig_S5D.pdf"),plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
 
 ########### S5E: TC conversions and mutations barplots ################
 
@@ -1004,7 +909,7 @@ TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
 
 write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="data/source_data/Fig_S5E.csv")
 
-save_plot("plots/Fig_S5E.pdf",TCpl, base_height = 4, base_width = 8)
+save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl, base_height = 4, base_width = 8)
 
 ############# S5F: full transcript categories barplot ###########
 
@@ -1028,7 +933,7 @@ pbar
 
 write_csv(mybar, file="data/source_data/Fig_S5F.csv")
 
-save_plot("plots/Fig_S5F.pdf",pbar)
+save_plot(file.path(plotdir,"Fig_S5F.pdf"),pbar)
 
 ########### Fig S6 ##########
 
@@ -1039,7 +944,7 @@ load("data/DEseq.RData")
 ## do not use log fold change shrinkage, merge RNA and CLIP fold changes and plot against each other
 unshrunk1 <- data.frame(results(dds, name="condition_R_vs_C"))
 unshrunkcl1 <- data.frame(results(ddscl, name="condition_R_vs_C"))
-m <- merge(data.frame(unshrunk1), data.frame(unshrunkcl1), by=0, all=F)%>%dplyr::rename(gene_name=Row.names)
+m <- base::merge(data.frame(unshrunk1), data.frame(unshrunkcl1), by=0, all=F)%>%dplyr::rename(gene_name=Row.names)
 colnames(m) <- gsub(".y",".CLIP", gsub(".x",".RNAseq", colnames(m)))
 mythreshold <- 0.01 # p adj cut off for color highlighting (cut off for CLIP)
 m1 <- m%>%dplyr::select(log2FoldChange.RNAseq, gene_name, log2FoldChange.CLIP, padj.CLIP)
@@ -1056,7 +961,7 @@ ggscat <-
        ,  y=expression("log"[2]*"FC CLIP (RMD/DMSO)") 
   ) +
   geom_text_repel(data=subset(m1, sign.CLIP &  abs(log2FoldChange.CLIP)>4 ),
-                  aes(log2FoldChange.RNAseq,log2FoldChange.CLIP, label=gene_name)) +
+                  aes(log2FoldChange.RNAseq,log2FoldChange.CLIP, label=gene_name),max.overlaps = Inf) +
   theme_classic() + theme(legend.position = "none") +
   geom_abline(lty=2, col="darkred") +
   NULL
@@ -1065,7 +970,7 @@ ggscat
 
 write_csv(m1, file="data/source_data/Fig_S6A.csv")
 
-save_plot("plots/Fig_S6A.pdf",ggscat)
+save_plot(file.path(plotdir,"Fig_S6A.pdf"),ggscat)
 
 ##################### S6B: motif heatmap for RMD #######################
 
@@ -1073,7 +978,7 @@ save_plot("plots/Fig_S6A.pdf",ggscat)
 fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
 fullheatr
 write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
-save_plot("plots/Fig_S6B.pdf",fullheatr)
+save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
 
 ########### Fig S7 ##########
 
@@ -1131,7 +1036,7 @@ bpstar
 
 write_csv(hl4, file = "data/source_data/Fig_S7B.csv")
 
-save_plot("plots/Fig_S7B.pdf",bpstar)
+save_plot(file.path(plotdir,"Fig_S7B.pdf"),bpstar)
 
 ################### S7C: ecdf for ARE #########################
 
@@ -1147,7 +1052,7 @@ ggsiARE <-
                      labels=summary(factor(fab_half$ARE))%>%paste(names(.),.,sep=": n=")) +
   NULL
 ggsiARE
-save_plot("plots/Fig_S7C.pdf",ggsiARE)
+save_plot(file.path(plotdir,"Fig_S7C.pdf"),ggsiARE)
 
 
 
