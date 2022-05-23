@@ -61,15 +61,14 @@ if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],
 ## get values
 config=config::get()
 
-## make sure those directories exist
 plotdir=config$plotdir ##Plots
 datadir=config$datadir ##data
 ann_dir=config$ann_dir ##annotation
 scriptdir=config$scriptdir ##scripts
 resultdir=config$resultdir ## results
-for(mydir in c(ann_dir,plotdir,resultdir)){
-  if(!dir.exists(mydir)) {dir.create(mydir)}
-}
+
+lapply(c(plotdir,ann_dir,resultdir), function(x) if(! dir.exists(x)){dir.create(x)})
+
 
 ## folder for R scripts
 ## warning if cannot find scripts
@@ -105,13 +104,13 @@ hg19=config$genome
 load(file.path(ann_dir,"myregions.RData"))
 
 ## merged CLIP peaks
-load(file.path(resultdir,"bed_reduced.RData")) ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
+load(file.path(datadir,"bed_reduced.RData")) ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
 
 ## import target genes
-load(file.path(resultdir,"target_genes.RData"))
+load(file.path(datadir,"target_genes.RData"))
 
 ## differential expression
-load(file.path(resultdir,"DEseq.RData")) 
+load(file.path(datadir,"DEseq.RData")) 
 
 
 ## bam file list
@@ -285,7 +284,6 @@ plotkmer=function(forggall,mytop=20){
 }
 
 ggkmer <- plotkmer(forggall,mytop=mytop)
-ggkmer
 
 gc()
 
@@ -604,7 +602,6 @@ ggsiIEG
 save_plot(file.path(plotdir,"Fig_5D.pdf"),ggsiIEG)
 
 ################### 5E: ecdf for target groups #################
-fab_half$target_group=relevel(fab_half$target_group, ref = "nontarget")
 
 ggsimean <- 
   ggplot(fab_half, aes(meanlogFC_DMSO, col=target_group)) +
@@ -697,6 +694,21 @@ options(ucscChromosomeNames=FALSE)
 #library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
 sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
 
+### clip tracks
+#cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
+#                              #,stacking = "hide"
+#                              , fontfamily="Arial",fontfamily.title="Arial"
+#                              , referenceSequence=sTrack
+#)
+#cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
+#                              , fontfamily="Arial",fontfamily.title="Arial"
+#                              , referenceSequence=sTrack
+#)
+#
+#rename tracks easily
+#cliptrack1@name <- "CLIP r1"
+#cliptrack2@name <- "CLIP r2"
+
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
 mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
@@ -709,96 +721,32 @@ grtrack <- GeneRegionTrack(
   ,fontfamily.title = myfont 
 )
 
-## CLIP coverage from bam
-cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              #, referenceSequence=sTrack
-                              ,type="coverage"
-                              ,col.deletion="darkred"
-)
-cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              #, referenceSequence=sTrack
-                              ,type="coverage"
-)
-
-## CLIP coverage and diagnostic events tracks from bigwig
-DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_DEs.plus.bw")
-                      , genome = "hg19"
-                      ,type="histogram"
-                      ,name = "DEs p32"
-                      ,col.histogram = "darkblue")
-
-DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
-                      , genome = "hg19"
-                      ,type="histogram"
-                      ,name = "DEs ir")
-
-covTrack1=DataTrack(range=file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
-                    , genome = "hg19"
-                    ,type="s"
-                    ,name = "coverage p32")
-
-covTrack2=DataTrack(range=file.path(datadir,"bigwigs","Ctrl1_CLIP_fwd.bw")
-                    , genome = "hg19"
-                    ,type="s"
-                    ,name = "coverage ir")
-
-
-## overlay conversions and coverage (the scale is not the same!!!)
-
-ot1 <- OverlayTrack(trackList=list(cliptrack1,DEtrack1), name="coverage and DEs p32") ## coverage from bam does not show deletions
-
-ot2 <- OverlayTrack(trackList=list(DEtrack1, covTrack1), name="coverage and DEs ir")
-
 
 ## need JUNB,FOS,EGR1
-goi=c("EGR1","FOS","JUNB")
-
-## smaller track with only intereting genes
-load(file.path(ann_dir,"gtf.RData"))
-smTxdb=makeTxDbFromGRanges(subset(gtf, gene_name%in%goi))
-smgrtrack <- GeneRegionTrack(
-  smTxdb
-  , fill="darkblue"
-  , collapseTranscripts="longest" ## show "meta" transcript to save space
-  ,fontfamily = myfont 
-  ,fontfamily.group = myfont 
-  ,fontfamily.title = myfont 
-)
-
-
 # just look up coordinates by hand
-ylims=c(10,50,300) ## set up manually
-
-mygenes <- data.frame(row.names = goi,
-                      gene=factor(goi,levels=c("EGR1","FOS","JUNB")),
+mygenes <- data.frame(row.names = c("EGR1","FOS","JUNB"),
+                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
                       chr=c("chr5","chr14","chr19"),
                       afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204),
-                      ylims=ylims)
-
+                      ato=c(137805547,75749523,12905204))
 igvs <- 
-  xyplot(1 ~ gene | gene, data = mygenes,
-          panel = function(x) {
+  xyplot(1 ~ gene | gene, data = 
+           data.frame(row.names = c("EGR1","FOS","JUNB"),
+                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
+                      chr=c("chr5","chr14","chr19"),
+                      afrom=c(137800454,75744708,12901667),
+                      ato=c(137805547,75749523,12905204)), #par.settings=list(axis.text=list(fontfamily="Comic Sans MS")),
+         panel = function(x) {
            afrom=mygenes$afrom[x]
            ato=mygenes$ato[x]
            chr=mygenes$chr[x]
-           ylim=mygenes$ylims[x]
-           plotTracks(c(
-             #ot1 #, ot2
-             cliptrack1
-             ,cliptrack2,smgrtrack),from = afrom,to = ato,chromosome = chr
-                      #,ylim=c(0,ylim)
-                      #,type="coverage"
-             ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
+           plotTracks(c(cliptrack1 ,cliptrack2, grtrack),from = afrom,to = ato,chromosome = chr,type="coverage",showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
                       main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
          }
          , layout=c(3,1)
          , scales = list(draw = FALSE)
          , xlab = NULL, ylab = NULL)
 ## be careful! if not full screen there wont be enough place and will get weird viewport error
-igvs
 
 fig5g=plot_grid(igvs)
 
@@ -808,51 +756,8 @@ save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
 
 ### new panel to zoom in
 
-## make new zoomed in coordinates
-for(mygene in goi){
-  ## get highest scoring cluster
-  myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
-  #chr=seqnames(myclus)@values
-  ## plot not cluster borders, but a window around crosslink
-  mywindow=100
-  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
-  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
-  
-}
+## need bed track
 
-igvs2 <- 
-  xyplot(1 ~ gene | gene, data = mygenes,
-         panel = function(x) {
-           afrom=mygenes$afrom2[x]
-           ato=mygenes$ato2[x]
-           chr=mygenes$chr[x]
-           ylim=mygenes$ylims[x]
-           plotTracks(c(
-             ot1 
-             #ot2
-             #,cliptrack1
-             #,cliptrack2,
-             #,DEtrack1
-             #,covTrack1
-             , smgrtrack
-             , sTrack
-             ),from = afrom,to = ato,chromosome = chr
-             ,ylim=c(0,ylim)
-             #,type="coverage"
-             ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(2,.1,.1),
-             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
-         }
-         , layout=c(1,3)
-         , scales = list(draw = FALSE)
-         , xlab = NULL, ylab = NULL)
-
-igvs2
-
-fig_5g_suppl=plot_grid(igvs2)
-
-fig_5g_suppl
-
-save_plot(file.path(plotdir,"Fig_5G_suppl.pdf"),base_asp = .8, base_height = 16,  fig_5g_suppl)
 
 ########### Fig S5 ##########
 
@@ -878,16 +783,12 @@ colnames(logCnt)%<>%paste0(.,"_log10_p1")
 
 ## record plots as objects for ctrl and RMD
 plot.new()
-pairs(logCnt%>%.[,!grepl("RMD",colnames(.))], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE
-      , labels = ifelse( grepl("CPEB4_",colnames(logCnt)%>%.[!grepl("RMD",.)]), "p32","ir" )
-      )
+pairs(logCnt%>%.[,1:3], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
 p_repr_c <- recordPlot()
 plot.new()
-pairs(logCnt%>%.[,grepl("RMD",colnames(.))], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE
-      , labels = ifelse( grepl("CPEB4_",colnames(logCnt)%>%.[grepl("RMD",.)]), "p32","ir" )
-        )
+pairs(logCnt%>%.[,4:6], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
 p_repr_r <- recordPlot() 
 
 write.csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
@@ -961,7 +862,7 @@ ggscat <-
        ,  y=expression("log"[2]*"FC CLIP (RMD/DMSO)") 
   ) +
   geom_text_repel(data=subset(m1, sign.CLIP &  abs(log2FoldChange.CLIP)>4 ),
-                  aes(log2FoldChange.RNAseq,log2FoldChange.CLIP, label=gene_name),max.overlaps = Inf) +
+                  aes(log2FoldChange.RNAseq,log2FoldChange.CLIP, label=gene_name)) +
   theme_classic() + theme(legend.position = "none") +
   geom_abline(lty=2, col="darkred") +
   NULL

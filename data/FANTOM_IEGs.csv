@@ -1,0 +1,233 @@
+"Total_count","Hs_count","Mm_count","Hs_symbol","Mm_symbol","Hs_RefSeq","Mm_RefSeq","Hs_name","MO_annotation"
+"18","8","10","JUNB","Junb","NM_002229","NM_008416","jun B proto-oncogene","AP1 family member transcription factor"
+"18","8","10","EGR1","Egr1","NM_001964","NM_007913","early growth response 1","Works as ERK-target axis"
+"17","7","10","NR4A1","Nr4a1","NM_002135|NM_173157|NM_001202233","NM_010444","nuclear receptor subfamily 4, group A, member 1",NA
+"17","8","9","DUSP1","Dusp1","NM_004417","NM_013642","dual specificity phosphatase 1","Inantivation of ERK"
+"16","8","8","ZFP36","Zfp36","NM_004926|NM_001244698|NM_001244701","NM_011756","ZFP36 ring finger protein","Degradation of AU-rich element (ARE)-containing mRNAs"
+"15","5","10","EGR2","Egr2","NM_000399","NM_010118","early growth response 2",NA
+"14","8","6","JUN","Jun","NM_002228","NM_010591","jun proto-oncogene","AP1 family member transcription factor"
+"13","6","7","FOS","Fos","NM_005252","NM_010234","FBJ murine osteosarcoma viral oncogene homolog","AP1 family member transcription factor, Protein stabilized by ERK"
+"13","7","6","IER3","Ier3","NM_003897","NM_133662","immediate early response 3",NA
+"12","6","6","IER2","Ier2","NM_004907","NM_010499","immediate early response 2",NA
+"12","8","4","ATF3","Atf3","NM_001674","NM_007498","activating transcription factor 3","AP1 family member transcription factor"
+"12","5","7","PTGS2","Ptgs2","NM_000963","NM_011198","prostaglandin-endoperoxide synthase 2 (prostaglandin G/H synthase and cyclooxygenase)",NA
+"11","7","4","EGR3","Egr3","NM_004430","NM_018781","early growth response 3",NA
+"11","6","5","CXCL2","Cxcl2","NM_002089","NM_009140","chemokine (C-X-C motif) ligand 2","Immnune signal"
+"10","4","6","MAFF","Maff","NM_001161572","NM_010755","v-maf musculoaponeurotic fibrosarcoma oncogene homolog F (avian)",NA
+"10","7","3","DUSP5","Dusp5","NM_004419","XM_140740","dual specificity phosphatase 5","Inantivation of ERK"
+"10","4","6","NFKBIZ","Nfkbiz","NM_031419","NM_001159394|NM_001159395|NM_030612","nuclear factor of kappa light polypeptide gene enhancer in B-cells inhibitor, zeta","Inhibition of NF-kB activity"
+"10","2","8","BTG2","Btg2","NM_006763","NM_007570","BTG family, member 2",NA
+"10","3","7","GADD45B","Gadd45b","NM_015675","NM_008655","growth arrest and DNA-damage-inducible, beta",NA
+"10","6","4","TRIB1","Trib1","NM_025195","NM_144549","tribbles homolog 1 (Drosophila)",NA
+"10","7","3","CYR61","Cyr61","NM_001554","NM_010516","cysteine-rich, angiogenic inducer, 61",NA
+"10","8","2","NR4A2","Nr4a2","NM_006186","NM_001139509|NM_013613","nuclear receptor subfamily 4, group A, member 2","Induce Foxp3 and regulates deifferentiation of CD+4 T cells"
+"10","7","3","KLF6","Klf6","NM_001300|NM_001160124|NM_001160125","NM_011803","Kruppel-like factor 6",NA
+"10","8","2","FOSB","Fosb","NM_006732","NM_008036","FBJ murine osteosarcoma viral oncogene homolog B","AP1 family member transcription factor"
+"9","5","4","GEM","Gem","NM_181702","NM_010276","GTP binding protein overexpressed in skeletal muscle",NA
+"9","4","5","RGS2","Rgs2","NM_002923","NM_009061","regulator of G-protein signaling 2, 24kDa",NA
+"8","4","4","TIPARP","Tiparp","NM_015508","NM_178892","TCDD-inducible poly(ADP-ribose) polymerase",NA
+"8","3","5","TNFAIP3","Tnfaip3","NM_001252385|NM_001252386|NM_001252390|NM_001252391|NM_006058|NM_001252392|NM_001252393|NM_001258454|NM_001258455|NM_001258456","NM_001166402|NM_009397","tumor necrosis factor, alpha-induced protein 3",NA
+"8","5","3","PHLDA1","Phlda1","NM_007350","NM_009344","pleckstrin homology-like domain, family A, member 1","Repression of Akt signal activity"
+"8","4","4","CXCL1","Cxcl1","NM_001511","NM_008176","chemokine (C-X-C motif) ligand 1 (melanoma growth stimulating activity, alpha)","Immune signal"
+"8","3","5","CCL2","Ccl2","NM_002982","NM_011333","chemokine (C-C motif) ligand 2",NA
+"8","5","3","EGR4","Egr4","NM_001965","NM_020596","early growth response 4",NA
+"7","4","3","DUSP6","Dusp6","NM_001946, NM_022652","NM_026268","dual specificity phosphatase 6","Inantivation of ERK"
+"7","5","2","HBEGF","Hbegf","NM_001945","NM_010415","heparin-binding EGF-like growth factor","Activation of EGF receptor family"
+"7","1","6","ERRFI1","Errfi1","NM_018948","NM_133753","ERBB receptor feedback inhibitor 1","Also called Mig6, negative regulater of EGF receptor kinase"
+"7","3","4","NFKBIA","Nfkbia","NM_020529","NM_010907","nuclear factor of kappa light polypeptide gene enhancer in B-cells inhibitor, alpha","Inhibition of NF-kB activity"
+"7","3","4","IL1A","Il1a","NM_000575","NM_010554","interleukin 1, alpha","Immune signal"
+"7","6","1","NR4A3","Nr4a3","NM_006981|NM_173200|NM_173199","NM_015743","nuclear receptor subfamily 4, group A, member 3",NA
+"7","6","1","F3","F3","NM_001993","NM_010171","coagulation factor III (thromboplastin, tissue factor)",NA
+"7","2","5","ARC","Arc","-","NM_001276684|NM_018790","activity-regulated cytoskeleton-associated protein",NA
+"6","6","0","CTGF","Ctgf","NM_001901","NM_010217","connective tissue growth factor",NA
+"6","2","4","CCRL2","Ccrl2","NM_003965|NM_001130910","NM_017466","chemokine (C-C motif) receptor-like 2",NA
+"6","3","3","DUSP2","Dusp2","NM_004418","NM_010090","dual specificity phosphatase 2","Inantivation of ERK"
+"6","1","5","SOCS3","Socs3","NM_003955","NM_007707","suppressor of cytokine signaling 3","Negative regulator of STAT3 signaling pathway"
+"6","3","3","FOSL2","Fosl2","NM_005253","NM_008037","FOS-like antigen 2","AP1 family member transcription factor"
+"6","5","1","MCL1","Mcl1","NM_021960","NM_008562","myeloid cell leukemia sequence 1 (BCL2-related)","Immnue signal"
+"6","4","2","ZC3H12A","Zc3h12a","NM_025079","NM_153159","zinc finger CCCH-type containing 12A",NA
+"6","2","4","IRF1","Irf1","NM_002198","NM_001159393|NM_001159396|NM_008390","interferon regulatory factor 1","Immnune signal"
+"6","5","1","RCAN1","Rcan1","NM_004414|NM_203417|NM_203418","NM_001081549|NM_019466","regulator of calcineurin 1",NA
+"6","6","0","BHLHE40","Bhlhe40","NM_003670","NM_011498","basic helix-loop-helix family, member e40",NA
+"5","4","1","KLF10","Klf10","NM_005655|NM_001032282","NM_013692","Kruppel-like factor 10",NA
+"5","1","4","CSF2","Csf2","NM_000758","NM_009969","colony stimulating factor 2 (granulocyte-macrophage)","Immune signal"
+"5","0","5","GADD45G","Gadd45g","NM_006705","NM_011817","growth arrest and DNA-damage-inducible, gamma",NA
+"5","1","4","TNFAIP2","Tnfaip2","NM_006291","NM_009396","tumor necrosis factor, alpha-induced protein 2","Inframmation signal"
+"5","4","1","AREG","Areg","NM_001657","NM_009704","amphiregulin","Activation of EGF receptor family"
+"5","2","3","PLK2","Plk2","NM_006622","NM_152804","polo-like kinase 2",NA
+"5","0","5","-","Myd116","-",NA,"-",NA
+"5","1","4","CD83","Cd83","NM_004233|NM_001040280|NM_001251901","NM_009856","CD83 molecule",NA
+"5","2","3","BCL10","Bcl10","NM_003921","NM_009740","B-cell CLL/lymphoma 10","Mediator of inflammation signal"
+"5","5","0","IL8","Il8","NM_000584","NM_011339","interleukin 8","Immune signal"
+"5","4","1","CXCL3","Cxcl3","NM_002090","NM_203320","chemokine (C-X-C motif) ligand 3","Immune signal"
+"5","4","1","PPP1R15A","Ppp1r15a","NM_014330","NM_008654","protein phosphatase 1, regulatory subunit 15A","Regulator of Akt signal"
+"5","2","3","KLF4","Klf4","NM_004235","NM_010637","Kruppel-like factor 4 (gut)",NA
+"5","1","4","REL","Rel","NM_002908","NM_009044","v-rel reticuloendotheliosis viral oncogene homolog (avian)","Mediator of inframmation signal"
+"4","3","1","CEBPD","Cebpd","NM_005195","NM_007679","CCAAT/enhancer binding protein (C/EBP), delta",NA
+"4","0","4","CCL3","Ccl3","NM_002983","NM_011337","chemokine (C-C motif) ligand 3","Immune signal"
+"4","0","4","CXCL10","Cxcl10","-","NM_021274","chemokine (C-X-C motif) ligand 10","Immune signal"
+"4","3","1","KLF2","Klf2","NM_016270","NM_008452","Kruppel-like factor 2 (lung)",NA
+"4","1","3","TNFSF9","Tnfsf9","NM_003811","NM_009404","tumor necrosis factor (ligand) superfamily, member 9","Control of inframmation signal"
+"4","1","3","TRAF1","Traf1","NM_005658","NM_009421","TNF receptor-associated factor 1","Mediator of inframmation signal"
+"4","1","3","NFKB2","Nfkb2","NM_001077494|NM_002502|NM_001261403","NM_001177369|NM_001177370|NM_019408","nuclear factor of kappa light polypeptide gene enhancer in B-cells 2 (p49/p100)","Mediator of inframmation signal"
+"4","0","4","TNF","Tnf","-","NM_013693","tumor necrosis factor","Immune signal"
+"4","3","1","ID1","Id1","NM_002165","NM_010495","inhibitor of DNA binding 1, dominant negative helix-loop-helix protein",NA
+"4","0","4","PIM1","Pim1","-","NM_008842","pim-1 oncogene",NA
+"4","2","2","PTGER4","Ptger4","NM_000958","NM_001136079|NM_008965","prostaglandin E receptor 4 (subtype EP4)",NA
+"4","3","1","RHOB","Rhob","NM_004040","NM_007483","ras homolog family member B","Mediator of membrane receptor kinase signal"
+"4","0","4","-","Bhlhb2","-",NA,"-",NA
+"4","3","1","ETS2","Ets2","NM_005239|NM_001256295","NM_011809","v-ets erythroblastosis virus E26 oncogene homolog 2 (avian)",NA
+"4","3","1","MYC","Myc","NM_002467","NM_001177352|NM_001177353|NM_001177354|NM_010849","v-myc myelocytomatosis viral oncogene homolog (avian)","Transcription factor, Protein stabilized by ERK"
+"4","1","3","BCL3","Bcl3","NM_005178","NM_033601","B-cell CLL/lymphoma 3",NA
+"4","2","2","SLC20A1","Slc20a1","NM_005415","NM_001159593|NM_015747","solute carrier family 20 (phosphate transporter), member 1",NA
+"4","4","0","SIK1","Sik1","NM_173354","NM_010831","salt-inducible kinase 1",NA
+"4","1","3","DUSP4","Dusp4","NM_001394","NM_176933","dual specificity phosphatase 4","Inactivation of ERK"
+"4","4","0","ADAMTS1","Adamts1","NM_006988","NM_009621","ADAM metallopeptidase with thrombospondin type 1 motif, 1",NA
+"4","0","4","CCRN4L","Ccrn4l","NM_012118","NM_009834","CCR4 carbon catabolite repression 4-like (S. cerevisiae)",NA
+"4","4","0","PLAU","Plau","NM_002658","NM_008873","plasminogen activator, urokinase",NA
+"4","2","2","SDC4","Sdc4","NM_002999","NM_011521","syndecan 4",NA
+"4","0","4","-","Axud1","-",NA,"-",NA
+"4","1","3","IL1B","Il1b","NM_000576","NM_008361","interleukin 1, beta","Immune signal"
+"4","3","1","MAP3K8","Map3k8","NM_005204","NM_007746","mitogen-activated protein kinase kinase kinase 8","Member of ERK"
+"4","1","3","RND3","Rnd3","NM_005168","NM_028810","Rho family GTPase 3",NA
+"4","3","1","IL6","Il6","NM_000600","NM_031168","interleukin 6 (interferon, beta 2)","Inflammation signal"
+"4","0","4","IFRD1","Ifrd1","NM_001550","NM_013562","interferon-related developmental regulator 1",NA
+"3","0","3","IL23A","Il23a","NM_016584","NM_031252","interleukin 23, alpha subunit p19",NA
+"3","2","1","CREM","Crem","NM_001881","NM_001110850|NM_001110851|NM_001110852|NM_001110853|NM_001110854|NM_001110855|NM_001110856|NM_001110857|NM_001110858|NM_001110859|NM_001271503|NM_001271504|NM_001271505|NM_001271506|NM_013498|NR_073193","cAMP responsive element modulator",NA
+"3","1","2","ISG15","Isg15","NM_005101","NM_015783","ISG15 ubiquitin-like modifier",NA
+"3","3","0","SGK1","Sgk1","-","NM_001161845|NM_001161847|NM_001161848|NM_001161849|NM_001161850|NM_011361","serum/glucocorticoid regulated kinase 1",NA
+"3","1","2","SQSTM1","Sqstm1","-","NM_011018","sequestosome 1",NA
+"3","0","3","CLEC4E","Clec4e","NM_014358","NM_019948","C-type lectin domain family 4, member E",NA
+"3","0","3","CFLAR","Cflar","NM_003879","NM_009805|NM_207653","CASP8 and FADD-like apoptosis regulator",NA
+"3","2","1","TSC22D1","Tsc22d1","NM_006022","NM_001177751|NM_009366|NM_207652","TSC22 domain family, member 1",NA
+"3","0","3","TLR2","Tlr2","-","NM_011905","toll-like receptor 2","Immune signal"
+"3","1","2","FLRT3","Flrt3","NM_013281","NM_001172160|NM_178382","fibronectin leucine rich transmembrane protein 3",NA
+"3","2","1","GBP1","Gbp2","NM_002053","NM_010260","guanylate binding protein 1, interferon-inducible",NA
+"3","0","3","-","Irg1","-","NM_008392","-",NA
+"3","1","2","CCL7","Ccl7","NM_006273","NM_013654","chemokine (C-C motif) ligand 7","Immune signal"
+"3","1","2","CSF1","Csf1","NM_000757","NM_001113529|NM_001113530|NM_007778","colony stimulating factor 1 (macrophage)","Immune signal"
+"3","2","1","FOSL1","Fosl1","NM_005438","NM_010235","FOS-like antigen 1","AP1 family member transcription factor"
+"3","1","2","SERPINE1","Serpine1","NM_000602","NM_008871","serpin peptidase inhibitor, clade E (nexin, plasminogen activator inhibitor type 1), member 1",NA
+"3","1","2","CCL5","Ccl5","NM_002985","NM_013653","chemokine (C-C motif) ligand 5","Immune signal"
+"3","2","1","CD69","Cd69","-","XM_132882","CD69 molecule",NA
+"3","1","2","NAB2","Nab2","NM_005967","NM_001122895|NM_008668","NGFI-A binding protein 2 (EGR1 binding protein 2)",NA
+"3","0","3","SKIL","Skil","NM_005414","NM_001039090|NM_001271772|NM_011386","SKI-like oncogene",NA
+"3","1","2","VCAM1","Vcam1","NM_001078","NM_011693","vascular cell adhesion molecule 1",NA
+"3","1","2","DNAJB1","Dnajb1","NM_006145","NM_018808","DnaJ (Hsp40) homolog, subfamily B, member 1",NA
+"3","3","0","CSRNP1","Csrnp1","NM_033027","NM_153287","cysteine-serine-rich nuclear protein 1",NA
+"3","2","1","KLF7","Klf7","NM_003709","NM_033563","Kruppel-like factor 7 (ubiquitous)",NA
+"3","0","3","IFIT1","Ifit1","NM_001548","NM_008331","interferon-induced protein with tetratricopeptide repeats 1",NA
+"3","0","3","IL10","Il10","NM_000572","NM_010548","interleukin 10","Immnune signal"
+"3","1","2","ICAM1","Icam1","-","NM_010493","intercellular adhesion molecule 1",NA
+"3","0","3","SERTAD1","Sertad1","NM_013376","NM_018820","SERTA domain containing 1",NA
+"3","3","0","EDN1","Edn1","-","NM_010104","endothelin 1",NA
+"3","0","3","CEBPB","Cebpb","NM_005194","NM_009883","CCAAT/enhancer binding protein (C/EBP), beta",NA
+"3","3","0","SELE","Sele","NM_000450","NM_011345","selectin E",NA
+"3","3","0","EPHA2","Epha2","NM_004431","NM_010139","EPH receptor A2",NA
+"3","3","0","LIF","Lif","NM_002309","NM_001039537|NM_008501","leukemia inhibitory factor",NA
+"3","0","3","CCL4","Ccl4","NM_002984","NM_013652","chemokine (C-C motif) ligand 4","Immnune signal"
+"3","0","3","MMP13","Mmp13","NM_002427","NM_008607","matrix metallopeptidase 13 (collagenase 3)","Migration of  cancer"
+"3","0","3","IER5","Ier5","NM_016545","NM_010500","immediate early response 5",NA
+"3","2","1","ADM","Adm","NM_001124","NM_009627","adrenomedullin",NA
+"3","1","2","VEGFA","Vegfa","NM_001025366","NM_001025250|NM_001025257|NM_001110266|NM_001110267|NM_001110268|NM_009505","vascular endothelial growth factor A",NA
+"3","1","2","CSF3","Csf3","NM_172220","NM_009971","colony stimulating factor 3 (granulocyte)",NA
+"3","2","1","SPRY2","Spry2","-","NM_011897","sprouty homolog 2 (Drosophila)","Control of EGF receptor signal"
+"3","0","3","PELI1","Peli1","NM_020651","NM_023324","pellino E3 ubiquitin protein ligase 1",NA
+"3","3","0","PMAIP1","Pmaip1","NM_021127","NM_021451","phorbol-12-myristate-13-acetate-induced protein 1",NA
+"3","1","2","PER1","Per1","-","NM_001159367|NM_011065","period circadian clock 1","Cell cycle control"
+"3","2","1","CITED2","Cited2","-","NM_010828","Cbp/p300-interacting transactivator, with Glu/Asp-rich carboxy-terminal domain, 2",NA
+"3","0","3","GPR19","Gpr19","NM_006143","NM_001167694|NM_001167695|NM_001167696|NM_001167697|NM_001167699|NM_001167700|NM_008157|NR_072990|NR_074084","G protein-coupled receptor 19",NA
+"3","3","0","HES1","Hes1","-","NM_008235","hairy and enhancer of split 1, (Drosophila)","Differentiation control"
+"3","0","3","GPR84","Gpr84","-","NM_030720","G protein-coupled receptor 84",NA
+"3","3","0","CCL20","Ccl20","NM_004591","NM_001159738|NM_016960","chemokine (C-C motif) ligand 20",NA
+"3","2","1","BIRC3","Birc3","NM_001165","NM_007464","baculoviral IAP repeat containing 3",NA
+"3","1","2","PRDM1","Prdm1","-","NM_007548","PR domain containing 1, with ZNF domain",NA
+"3","2","1","GDF15","Gdf15","NM_004864","NM_011819","growth differentiation factor 15",NA
+"3","0","3","DUSP14","Dusp14","NM_007026","NM_019819","dual specificity phosphatase 14","Inactivation of ERK"
+"2","2","0","NEDD9","Nedd9","NM_006403","NM_001111324|NM_017464","neural precursor cell expressed, developmentally down-regulated 9","a member of Crk-associated substrate"
+"2","1","1","ID3","Id3","NM_002167","NM_008321","inhibitor of DNA binding 3, dominant negative helix-loop-helix protein",NA
+"2","0","2","-","Ccl12","-","NM_011331","-",NA
+"2","2","0","SRF","Srf","NM_003131","NM_020493","serum response factor (c-fos serum response element-binding transcription factor)",NA
+"2","0","2","NFKBID","Nfkbid","NM_032721","NM_172142","nuclear factor of kappa light polypeptide gene enhancer in B-cells inhibitor, delta","Mediator of inflammation signal"
+"2","1","1","TGIF1","Tgif1","NM_170695","NM_001164074|NM_001164075|NM_001164076|NM_001164077|NM_009372","TGFB-induced factor homeobox 1",NA
+"2","0","2","TREX1","Trex1","NM_016381","NM_001012236|NM_011637","three prime repair exonuclease 1",NA
+"2","1","1","ID2","Id2","NM_002166","NM_010496","inhibitor of DNA binding 2, dominant negative helix-loop-helix protein",NA
+"2","0","2","FRMD6","Frmd6","NM_152330","NM_028127","FERM domain containing 6",NA
+"2","1","1","KLHL21","Klhl21","NM_014851","XM_144142","kelch-like family member 21",NA
+"2","2","0","ELL2","Ell2","NM_012081","NM_138953","elongation factor, RNA polymerase II, 2",NA
+"2","0","2","SLC2A1","Slc2a1","NM_006516","NM_011400","solute carrier family 2 (facilitated glucose transporter), member 1",NA
+"2","0","2","CASP4","Casp4","NM_001225","NM_007609","caspase 4, apoptosis-related cysteine peptidase",NA
+"2","0","2","TRIM13","Trim13","NM_001007278","NM_001164220|NM_023233","tripartite motif containing 13",NA
+"2","0","2","TOB1","Tob1","-","NM_009427","transducer of ERBB2, 1","Control of EGF receptor family"
+"2","0","2","IKBKE","Ikbke","-","NM_019777","inhibitor of kappa light polypeptide gene enhancer in B-cells, kinase epsilon",NA
+"2","0","2","OASL","Oasl1","NM_003733","NM_145209","2'-5'-oligoadenylate synthetase-like",NA
+"2","2","0","SOWAHC","Sowahc","NM_023016","NM_172939","sosondowah ankyrin repeat domain family member C",NA
+"2","0","2","SLC16A1","Slc16a1","NM_003051","NM_009196","solute carrier family 16, member 1 (monocarboxylic acid transporter 1)",NA
+"2","2","0","ZFP36L2","Zfp36l2","NM_006887","NM_001001806","ZFP36 ring finger protein-like 2",NA
+"2","0","2","LMCD1","Lmcd1","NM_014583","NM_144799","LIM and cysteine-rich domains 1",NA
+"2","0","2","IRF4","Irf4","-","NM_013674","interferon regulatory factor 4","NF-kB target gene"
+"2","0","2","SIAH2","Siah2","NM_005067","NM_009174","siah E3 ubiquitin protein ligase 2",NA
+"2","2","0","NUAK2","Nuak2","NM_030952","NM_001195025|NM_028778","NUAK family, SNF1-like kinase, 2",NA
+"2","0","2","OSGIN2","Osgin2","NM_004337","NM_145950","oxidative stress induced growth inhibitor family member 2",NA
+"2","0","2","RASGEF1B","Rasgef1b","NM_152545","NM_145839|NM_181318","RasGEF domain family, member 1B","Signal activity"
+"2","2","0","ZBTB10","Zbtb10","NM_023929","NM_177660","zinc finger and BTB domain containing 10",NA
+"2","0","2","SERTAD2","Sertad2","NM_014755","NM_001038625|NM_021372","SERTA domain containing 2",NA
+"2","0","2","ARL4D","Arl4d","NM_001661","NM_025404","ADP-ribosylation factor-like 4D",NA
+"2","0","2","GPR85","Gpr85","-","NM_145066","G protein-coupled receptor 85",NA
+"2","0","2","RGS4","Rgs4","NM_005613","NM_009062","regulator of G-protein signaling 4",NA
+"2","0","2","-","Slfn2","-","NM_011408","-",NA
+"2","0","2","PNRC1","Pnrc1","NM_006813","XM_131355","proline-rich nuclear receptor coactivator 1",NA
+"2","1","1","ZFAND5","Zfand5","-","NM_009551","zinc finger, AN1-type domain 5",NA
+"2","0","2","ATF4","Atf4","NM_001675","NM_009716","activating transcription factor 4 (tax-responsive enhancer element B67)","AP1 family member transcription factor"
+"2","0","2","S100A9","S100a9","NM_002965","NM_009114","S100 calcium binding protein A9",NA
+"2","0","2","AMPD3","Ampd3","NM_000480","NM_001276301|NM_009667","adenosine monophosphate deaminase 3",NA
+"2","0","2","UBC","Ubc","NM_021009","NM_019639","ubiquitin C",NA
+"2","2","0","FOXC2","Foxc2","NM_005251","NM_013519","forkhead box C2 (MFH-1, mesenchyme forkhead 1)",NA
+"2","2","0","SLC2A3","Slc2a3","NM_006931","NM_011401","solute carrier family 2 (facilitated glucose transporter), member 3",NA
+"2","0","2","IFIH1","Ifih1","NM_022168","NM_001164477|NM_027835","interferon induced with helicase C domain 1",NA
+"2","1","1","ZFP36L1","Zfp36l1","-","NM_007564","ZFP36 ring finger protein-like 1",NA
+"2","1","1","EIF5A","Eif5a","NM_001970","NM_001166589|NM_001166590|NM_001166591|NM_001166592|NM_001166593|NM_001166594|NM_001166595|NM_001166596|NM_181582","eukaryotic translation initiation factor 5A",NA
+"2","1","1","CDC42EP2","Cdc42ep2","NM_006779","NM_026772","CDC42 effector protein (Rho GTPase binding) 2",NA
+"2","1","1","BCL2A1","Bcl2a1a","NM_004049","NM_009742","BCL2-related protein A1",NA
+"2","0","2","MAFK","Mafk","NM_002360","NM_010757","v-maf musculoaponeurotic fibrosarcoma oncogene homolog K (avian)",NA
+"2","1","1","CH25H","Ch25h","NM_003956","NM_009890","cholesterol 25-hydroxylase",NA
+"2","0","2","RELB","Relb","-","NM_009046","v-rel reticuloendotheliosis viral oncogene homolog B","NF-kB family"
+"2","2","0","MIR22HG","Mir22hg","-","NR_030711","MIR22 host gene (non-protein coding)",NA
+"2","2","0","B3GNT5","B3gnt5","NM_032047","NM_001159407|NM_001159408|NM_054052","UDP-GlcNAc:betaGal beta-1,3-N-acetylglucosaminyltransferase 5",NA
+"2","0","2","CD14","Cd14","NM_000591","NM_009841","CD14 molecule",NA
+"2","2","0","RYBP","Rybp","NM_012234","NM_019743","RING1 and YY1 binding protein",NA
+"2","0","2","IRS2","Irs2","NM_003749","NM_001081212","insulin receptor substrate 2","Mediate insuling signal"
+"2","0","2","NPAS4","Npas4","NM_178864","NM_153553","neuronal PAS domain protein 4",NA
+"2","2","0","CXCR7","Cxcr7","NM_020311","NM_001271607|NM_007722","chemokine (C-X-C motif) receptor 7","Immune signal"
+"2","0","2","NFKBIE","Nfkbie","-","NM_008690","nuclear factor of kappa light polypeptide gene enhancer in B-cells inhibitor, epsilon","NF-kB inhibition"
+"2","0","2","NFKBIB","Nfkbib","NM_002503","NM_010908","nuclear factor of kappa light polypeptide gene enhancer in B-cells inhibitor, beta","NF-kB inhibition"
+"2","1","1","HMGA1","Hmga1","NM_145899","NM_001025427|NM_001039356|NM_001166535|NM_001166536|NM_001166537|NM_001166539|NM_001166540|NM_001166541|NM_001166542|NM_001166543|NM_001166544|NM_001166545|NM_001166546|NM_016660","high mobility group AT-hook 1",NA
+"2","1","1","NFE2L2","Nfe2l2","NM_006164","NM_010902","nuclear factor (erythroid-derived 2)-like 2",NA
+"2","0","2","SPTY2D1","Spty2d1","NM_194285","NM_175318","SPT2, Suppressor of Ty, domain containing 1 (S. cerevisiae)",NA
+"2","0","2","NFKB1","Nfkb1","-","NM_008689","nuclear factor of kappa light polypeptide gene enhancer in B-cells 1","NF-kB transcription factor activity"
+"2","0","2","IFNB1","Ifnb1","NM_002176","NM_010510","interferon, beta 1, fibroblast","Immune signal, Toll-like receptor ligand"
+"2","0","2","ICOSLG","Icosl","NM_015259","NM_015790","inducible T-cell co-stimulator ligand",NA
+"2","0","2","RGS1","Rgs1","NM_002922","NM_015811","regulator of G-protein signaling 1",NA
+"2","0","2","ITGA5","Itga5","-","NM_010577","integrin, alpha 5 (fibronectin receptor, alpha polypeptide)",NA
+"2","0","2","EHD1","Ehd1","NM_006795","NM_010119","EH-domain containing 1",NA
+"2","0","2","-","Saa3","-","NM_011315","-",NA
+"2","0","2","C1orf51","Gm129","NM_144697","NM_001033302","chromosome 1 open reading frame 51",NA
+"2","0","2","MDM2","Mdm2","NM_006880","NM_010786","MDM2 oncogene, E3 ubiquitin protein ligase",NA
+"2","0","2","FBXO33","Fbxo33","-","XM_127032","F-box protein 33",NA
+"2","1","1","CCNL1","Ccnl1","NM_020307","NM_019937","cyclin L1",NA
+"2","0","2","PDE4B","Pde4b","NM_002600","NM_001177980|NM_001177981|NM_001177982|NM_001177983|NM_019840","phosphodiesterase 4B, cAMP-specific",NA
+"2","1","1","CBX4","Cbx4","NM_003655","NM_007625","chromobox homolog 4",NA
+"2","0","2","CLIC4","Clic4","NM_013943","NM_013885","chloride intracellular channel 4",NA
+"2","2","0","TBX3","Tbx3","NM_016569, NM_005996","NM_011535|NM_198052","T-box 3",NA
+"2","0","2","-","Snf1lk","-",NA,"-",NA
+"2","0","2","ZC3H12C","Zc3h12c","NM_033390","NM_001162921","zinc finger CCCH-type containing 12C",NA
+"2","1","1","KDM6B","Kdm6b","XM_043272","NM_001017426","lysine (K)-specific demethylase 6B",NA
+"2","0","2","OLR1","Olr1","NM_002543","NM_138648","oxidized low density lipoprotein (lectin-like) receptor 1",NA
+"2","2","0","GADD45A","Gadd45a","NM_001924","NM_007836","growth arrest and DNA-damage-inducible, alpha",NA
+"2","0","2","IL12B","Il12b","NM_002187","NM_008352","interleukin 12B (natural killer cell stimulatory factor 2, cytotoxic lymphocyte maturation factor 2, p40)",NA
+"2","0","2","PVR","Pvr","NM_006505","NM_027514","poliovirus receptor",NA
+"2","1","1","SRFBP1","Srfbp1","NM_152546","NM_026040|XM_003946020","serum response factor binding protein 1",NA
+"2","2","0","BMP2","Bmp2","-","NM_007553","bone morphogenetic protein 2","Transforming growth factor-beta (TGFB) superfamily"
+"2","2","0","ZNF93","-","NM_031218","-","zinc finger protein 93",NA
+"2","0","2","CLCF1","Clcf1","NM_013246","NM_019952","cardiotrophin-like cytokine factor 1",NA
+"2","1","1","ARID5B","Arid5b","XM_084482","NM_023598","AT rich interactive domain 5B (MRF1-like)",NA
