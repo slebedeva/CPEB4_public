@@ -1,7 +1,8 @@
 #### make figures for CPEB4 manuscript
 
-## working dir is where this source file is
-basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
+## working dir is where this source file is (rstudio only)
+#basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
+basedir="."
 setwd(basedir)
 message("your working directory is: ", getwd())
 message("your libraries are in: ", paste(.libPaths(), collapse = "; "))
@@ -408,7 +409,7 @@ save_plot(file.path(plotdir,"Fig_4E.pdf"),fullheatc)
 ## run the code for main Fig 4E first
 fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
 #fullheatr
-write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
+write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file=file.path(resultdir,"source_data/Fig_S6B.csv"))
 save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
 
 
@@ -806,170 +807,6 @@ write_csv(gsea_df%>%.[order(.$padj),], file=file.path(resultdir,"source_data/Fig
 
 save_plot(file.path(plotdir,"Fig_5F.pdf"),ggsea)
 
-################################ Fig 5G: example genome browser shots #############################################
-
-message("plotting gviz screenshots... can crash!")
-
-## need font otherwise error saving figure
-loadfonts(device = "postscript")
-par(family="Arial")
-ps.options(family="Arial")
-myfont="Arial"
-
-
-#library(Gviz)
-options(ucscChromosomeNames=FALSE)
-
-## sequence track - will see T-to-C conversions
-#library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
-sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
-
-## gene region track
-## gencode has too many transcripts for plotting, use meta-transcript feature
-# mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
-# grtrack <- GeneRegionTrack(
-#   mytxdb
-#   , fill="darkblue"
-#   , collapseTranscripts="longest" ## show "meta" transcript to save space
-#   ,fontfamily = myfont 
-#   ,fontfamily.group = myfont 
-#   ,fontfamily.title = myfont 
-# )
-
-## CLIP coverage from bam
-cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              #, referenceSequence=sTrack
-                              ,type="coverage"
-                              ,col.deletion="darkred"
-)
-cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
-                              , fontfamily="Arial",fontfamily.title="Arial"
-                              #, referenceSequence=sTrack
-                              ,type="coverage"
-)
-
-## CLIP coverage and diagnostic events tracks from bigwig
-DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_DEs.plus.bw")
-                      , genome = "hg19"
-                      ,type="histogram"
-                      ,name = "DEs p32"
-                      ,col.histogram = "darkblue")
-
-DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
-                      , genome = "hg19"
-                      ,type="histogram"
-                      ,name = "DEs ir")
-
-
-## overlay conversions and coverage (the scale is not the same!!!)
-
-ot1 <- OverlayTrack(trackList=list(cliptrack1,DEtrack1), name="coverage and DEs p32") ## coverage from bam does not show deletions
-
-
-## need JUNB,FOS,EGR1
-goi=c("EGR1","FOS","JUNB")
-
-## smaller gene track with only intereting genes
-load(file.path(ann_dir,"gtf.RData"))
-smTxdb=makeTxDbFromGRanges(subset(gtf, gene_name%in%goi))
-smgrtrack <- GeneRegionTrack(
-  smTxdb
-  , fill="darkblue"
-  , collapseTranscripts="longest" ## show "meta" transcript to save space
-  ,fontfamily = myfont 
-  ,fontfamily.group = myfont 
-  ,fontfamily.title = myfont 
-)
-
-
-# just look up coordinates by hand
-ylims=c(10,50,300) ## set up manually
-
-mygenes <- data.frame(row.names = goi,
-                      gene=factor(goi,levels=c("EGR1","FOS","JUNB")),
-                      chr=c("chr5","chr14","chr19"),
-                      afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204),
-                      ylims=ylims)
-
-igvs <- 
-  xyplot(1 ~ gene | gene, data = mygenes,
-         panel = function(x) {
-           afrom=mygenes$afrom[x]
-           ato=mygenes$ato[x]
-           chr=mygenes$chr[x]
-           ylim=mygenes$ylims[x]
-           plotTracks(c(
-             #ot1 #, ot2
-             cliptrack1
-             ,cliptrack2,smgrtrack),from = afrom,to = ato,chromosome = chr
-             #,ylim=c(0,ylim)
-             #,type="coverage"
-             ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
-             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
-         }
-         , layout=c(3,1)
-         , scales = list(draw = FALSE)
-         , xlab = NULL, ylab = NULL)
-## be careful! if not full screen there wont be enough place and will get weird viewport error
-#igvs
-
-fig5g=plot_grid(igvs)
-
-#fig5g
-
-save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
-
-### new panel to zoom in
-
-## make new zoomed in coordinates
-for(mygene in goi){
-  ## get highest scoring cluster
-  myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
-  #chr=seqnames(myclus)@values
-  ## plot not cluster borders, but a window around crosslink
-  mywindow=100
-  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
-  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
-  
-}
-
-igvs2 <- 
-  xyplot(1 ~ gene | gene, data = mygenes,
-         panel = function(x) {
-           afrom=mygenes$afrom2[x]
-           ato=mygenes$ato2[x]
-           chr=mygenes$chr[x]
-           ylim=mygenes$ylims[x]
-           plotTracks(c(
-             ot1 
-             #ot2
-             #,cliptrack1
-             #,cliptrack2,
-             #,DEtrack1
-             #,covTrack1
-             , smgrtrack
-             , sTrack
-           ),from = afrom,to = ato,chromosome = chr
-           ,ylim=c(0,ylim)
-           #,type="coverage"
-           ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(3,.1,.1),
-           main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
-         }
-         , layout=c(1,3)
-         , scales = list(draw = FALSE)
-         , xlab = NULL, ylab = NULL)
-
-#igvs2
-
-fig_5g_suppl=plot_grid(igvs2)
-
-#fig_5g_suppl
-
-save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 15,  fig_5g_suppl)
-
-
 
 ########### Fig S5 ##########
 
@@ -1200,19 +1037,214 @@ message("Out of IEGs with half-lives and strong targets (>=1000 DEs), stabilized
         )
 ##19
 
+################################ Fig 5G: example genome browser shots #############################################
+
+message("plotting gviz screenshots... can crash!")
+
+## need font otherwise error saving figure
+loadfonts(device = "postscript")
+par(family="Arial")
+ps.options(family="Arial")
+myfont="Arial"
 
 
-########
+#library(Gviz)
+options(ucscChromosomeNames=FALSE)
 
-# ## even if one of the overlapping genes is IEG it will be TRUE here
-# target_genes$IEG=as.logical(unlist(lapply(target_genes$gene_names %>% strsplit(";"), function(x) sum(x%in%fantom_ieg$Hs_symbol))))
-# 
-# ## foldchange: we can only assign to unambiguous target genes - or we collapse it again, but then it is not numeric, so this table is not for plotting, but for visual inspection only!
-# target_genes$meanlog2FC_hl_DMSO=unlist(lapply(target_genes$gene_names %>% strsplit(";"), function(x) paste(round(fab_half$meanlogFC_DMSO[fab_half$X%in%x],2),collapse=";")))
-# 
-# ## final table of target genes
-# ## this is also the Supplementary table S6
-# write.csv(target_genes, file = file.path(resultdir,"table_S6_cpeb4_target_genes.csv"), row.names = F) 
+## sequence track - will see T-to-C conversions
+#library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
+sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
+
+## gene region track
+## gencode has too many transcripts for plotting, use meta-transcript feature
+# mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
+# grtrack <- GeneRegionTrack(
+#   mytxdb
+#   , fill="darkblue"
+#   , collapseTranscripts="longest" ## show "meta" transcript to save space
+#   ,fontfamily = myfont 
+#   ,fontfamily.group = myfont 
+#   ,fontfamily.title = myfont 
+# )
+
+## CLIP coverage from bam
+cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+                              ,col.deletion="darkred"
+)
+cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+)
+
+## CLIP coverage and diagnostic events tracks from bigwig
+DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_DEs.plus.bw")
+                      , genome = "hg19"
+                      ,type="histogram"
+                      ,name = "coverage and DEs"
+                      ,col.histogram = "darkblue"
+                      ,fill.histogram = "darkblue")
+
+#DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
+#                      , genome = "hg19"
+#                      ,type="histogram"
+#                      ,name = "DEs"
+#                      ,col.histogram = "darkblue"
+#                      ,fill.histogram = "darkblue")
+
+covTrack1=DataTrack(range="data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw"
+                    , genome = "hg19"
+                    ,type="s"
+                    ,name = "coverage")
+
+#covTrack2=DataTrack(range=allbams[3]
+#                    , genome = "hg19"
+#                    ,type="l"
+#                    #,window="auto"
+#                    ,name = "coverage p32")
+
+
+## overlay conversions and coverage (the scale is not the same!!!)
+
+#ot1 <- OverlayTrack(trackList=list(cliptrack1,DEtrack1), name="coverage and DEs") ## coverage from bam does not show deletions
+ot2 <- OverlayTrack(trackList=list(DEtrack1,covTrack1), name="coverage and DEs") ## coverage from bam does not show deletions
+
+
+## need JUNB,FOS,EGR1
+goi=c("EGR1","FOS","JUNB")
+
+## smaller gene track with only interesting genes
+if(!file.exists(file.path(ann_dir,"smTxdb.RData"))){
+  load(file.path(ann_dir,"gtf.RData"))
+  smTxdb=makeTxDbFromGRanges(subset(gtf, gene_name%in%goi))
+  saveDb(smTxdb,file = file.path(ann_dir,"smTxdb.RData"))
+}
+smTxdb=loadDb(file.path(ann_dir,"smTxdb.RData"))
+smgrtrack <- GeneRegionTrack(
+  smTxdb
+  , fill="darkblue"
+  , collapseTranscripts="longest" ## show "meta" transcript to save space
+  ,fontfamily = myfont 
+  ,fontfamily.group = myfont 
+  ,fontfamily.title = myfont 
+)
+
+
+# just look up coordinates by hand
+ylims=c(10,50,300) ## set up manually
+
+mygenes <- data.frame(row.names = goi,
+                      gene=factor(goi,levels=c("EGR1","FOS","JUNB")),
+                      chr=c("chr5","chr14","chr19"),
+                      afrom=c(137800454,75744708,12901667),
+                      ato=c(137805547,75749523,12905204),
+                      ylims=ylims)
+
+igvs <- 
+  xyplot(1 ~ gene | gene, data = mygenes,
+         panel = function(x) {
+           afrom=mygenes$afrom[x]
+           ato=mygenes$ato[x]
+           chr=mygenes$chr[x]
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             #ot1 #, ot2
+             cliptrack1
+             ,cliptrack2,smgrtrack),from = afrom,to = ato,chromosome = chr
+             #,ylim=c(0,ylim)
+             #,type="coverage"
+             ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
+             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+         }
+         , layout=c(3,1)
+         , scales = list(draw = FALSE)
+         , xlab = NULL, ylab = NULL)
+## be careful! if not full screen there wont be enough place and will get weird viewport error
+#igvs
+
+fig5g=plot_grid(igvs)
+
+#fig5g
+
+save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
+
+
+
+### new panel to zoom in
+
+
+## make new zoomed in coordinates
+mywindow=100
+
+for(mygene in goi){
+  ## get highest scoring cluster
+  myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
+  #chr=seqnames(myclus)@values
+  ## plot not cluster borders, but a window around crosslink
+  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
+  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
+  ## get all coordinates to fill in 0 coverage
+  #gr=GRanges(seqnames = rep(mygenes$chr, each=mywindow), ranges = IRanges(start = mygenes$afrom2:mygenes$ato2,width=1))
+}
+
+
+## because coverage of 0 does not show try to do it by hand from bigwig
+cv=rtracklayer::import("data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
+
+## some granges arithmetic
+gr=GRanges(seqnames = mygenes$chr, ranges = IRanges(start=mygenes$afrom2
+                                                    ,end=mygenes$ato2))
+## substract those intervals from bw which have score
+gr1=subsetByOverlaps(cv,gr)
+## find the difference and add to the ones before
+dif=plyranges::setdiff_ranges(gr,gr1)
+dif$score=0
+newgr=sort(c(dif,gr1))
+
+
+newcovTrack=DataTrack(range = newgr, type="S")
+
+
+igvs2 <- 
+  xyplot(1 ~ gene | gene, data = mygenes,
+         panel = function(x) {
+           afrom=mygenes$afrom2[x]
+           ato=mygenes$ato2[x]
+           chr=mygenes$chr[x]
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             #ot1 
+             ot2
+             #newcovTrack
+             #,cliptrack1
+             #,cliptrack2,
+             #,DEtrack1
+             #,covTrack1
+             , smgrtrack
+             , sTrack
+           ),from = afrom,to = ato,chromosome = chr
+           ,ylim=c(0,ylim)
+           #,type="coverage"
+           ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(3,.1,.1),
+           main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+         }
+         , layout=c(1,3)
+         , scales = list(draw = FALSE)
+         , xlab = NULL, ylab = NULL)
+
+igvs2
+
+fig_5g_suppl=plot_grid(igvs2)
+
+#fig_5g_suppl
+
+save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 15,  fig_5g_suppl)
+
+
+
 
 
 
