@@ -1,0 +1,14 @@
+default:
+  genome: "annotation/GRCh37.p13.genome.fa.bgz"
+  global_size: 14
+  ann_dir: "annotation"
+  datadir: "data"
+  resultdir: "results"
+  plotdir: "plots"
+  scriptdir: "scripts"
+
+## to activate alternative environment: `Sys.setenv(R_CONFIG_ACTIVE = "old_DE")`
+old_DE:
+  resultdir: "results_oldDEMaxTC"
+  plotdir: "plots_oldDEMaxTC"
+

@@ -241,10 +241,10 @@ ctrl2$name2 <- ctrl2$name
 ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
 
 ## for fair comparison of revision, keep thick as before (max)
-ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
-                                    ifelse(!is.na(ctrl2$thickTDMax),ctrl2$thickTDMax,
-                                           (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
-                       width=1)
+#ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
+#                                    ifelse(!is.na(ctrl2$thickTDMax),ctrl2$thickTDMax,
+#                                           (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2)))),
+#                       width=1)
 ## make "thick" point a max of TC (prioritize) or TD and if DEs are absent, just the middle of the cluster
 ## since the score is sum DE, it would also make sense to have sumDE as the thick point
 ## if there is no DE we take midpoint but we should put NA actually!
@@ -252,21 +252,31 @@ ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
                         ##, (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2))))
 #                                     ,NA  
 #                                     ,width=1)
-export.bed(ctrl2, file.path(resultdir, "CPEB4_Ctrl_hg19.bed"))
 rmd2$score <- rmd2$sumDE
 rmd2$score[is.na(rmd2$score)]<-0
 rmd2$name2 <- rmd2$name
 rmd2$name <- paste(rmd2$name,rmd2$condition,sep="@")
-## old way
-rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCMax),rmd2$thickTCMax,
-                                   ifelse(!is.na(rmd2$thickTDMax),rmd2$thickTDMax,
-                                          (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
-                      width=1)
+### old way
+#rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCMax),rmd2$thickTCMax,
+#                                   ifelse(!is.na(rmd2$thickTDMax),rmd2$thickTDMax,
+#                                          (start(ranges(rmd2))+round(width(ranges(rmd2))/2)))),
+#                      width=1)
 ## new way
 # rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickDESum),rmd2$thickTESum
 #                                     ,NA  
 #                                     ,width=1)
 
+## we cannot use NA in Granges, so we will just take a middle if the peak has no DEs.
+ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickDESum),ctrl2$thickDESum,
+                                    (start(ranges(ctrl2))+round(width(ranges(ctrl2))/2))),
+                       width=1)
+
+rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickDESum),rmd2$thickDESum,
+                                   (start(ranges(rmd2))+round(width(ranges(rmd2))/2))),
+                      width=1)
+
+
+export.bed(ctrl2, file.path(resultdir, "CPEB4_Ctrl_hg19.bed"))
 export.bed(rmd2, file.path(resultdir, "CPEB4_RMD_hg19.bed")) 
 
 ############ this is our main bed peak file for further analysis: ####################
@@ -296,10 +306,8 @@ target_genes$gene_target_group <-
   gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%
   gsub("[0-9]+\\]","more",.)%>%gsub("\\,","\\-",.)
 target_genes
-## final table of target genes
-## this is also the Supplementary table S6
-write.csv(target_genes, file = file.path(resultdir,"table_S6_cpeb4_target_genes.csv"), row.names = F) 
 
 save(target_genes,file=file.path(resultdir, "target_genes.RData"))
 
+write.csv(target_genes, file = file.path(resultdir,"table_S6_cpeb4_target_genes.csv"), row.names = F) 
 

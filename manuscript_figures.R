@@ -67,7 +67,7 @@ ann_dir=config$ann_dir ##annotation
 scriptdir=config$scriptdir ##scripts
 resultdir=config$resultdir ## results
 
-lapply(c(plotdir,ann_dir,resultdir), function(x) if(! dir.exists(x)){dir.create(x)})
+lapply(c(plotdir,ann_dir,resultdir, file.path(resultdir,"source_data")), function(x) if(! dir.exists(x)){dir.create(x)})
 
 
 ## folder for R scripts
@@ -170,7 +170,7 @@ ppie <-
 
 ppie
 
-write_csv(mypie, file = file.path(resultdir,"Fig_4B.csv"))
+write_csv(mypie, file = file.path(resultdir,"source_data/Fig_4B.csv"))
 
 save_plot(file.path(plotdir,"Fig_4B.pdf"),ppie)
 
@@ -287,7 +287,7 @@ ggkmer <- plotkmer(forggall,mytop=mytop)
 
 gc()
 
-write_csv(forggall,file=file.path(resultdir,"Fig_4D.csv"))
+write_csv(forggall,file=file.path(resultdir,"source_data/Fig_4D.csv"))
 
 save_plot(file.path(plotdir,"Fig_4D.pdf"),ggkmer)
 
@@ -349,7 +349,7 @@ heatMatrix(kmersc$scaled_mat, xcoords = (1:(mywindow-k+1))-25+2,
 heatc <- grid.grab()
 plot.new()
 set.seed(42) ##for clusters
-heatMatrix(kmersr$scaled_mat, xcoords = c(-25, 20),
+heatMatrix(kmersr$scaled_mat, xcoords = (1:(mywindow-k+1))-25+2,
            group = as.list(rownames(kmersr$km_matrix)),
            group.col = my_palette[c(1,3)],
            clustfun = function(x) kmeans(x,2)$cluster,
@@ -393,15 +393,139 @@ pwmr=ggplot(df, aes(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, motif=motif)) +
 
 fullheatc=plot_grid(pwmc,heatc, rel_widths = c(1,3))
 
-fullheatc
+#fullheatc
 
 
 
 ### source data provided as unscaled score matrix with cluster number
 write.csv(cbind(as.data.frame(kmersc$km_matrix%>%t()),kmc$cluster),
-          file=file.path(resultdir,"Fig_4E.csv"))
+          file=file.path(resultdir,"source_data/Fig_4E.csv"))
 
 save_plot(file.path(plotdir,"Fig_4E.pdf"),fullheatc)
+
+##################### S6B: motif heatmap for RMD #######################
+
+## run the code for main Fig 4E first
+fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
+#fullheatr
+write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
+save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
+
+
+##################### related to 4E: examples of motifs for top 100 genes #######################
+
+## take top 100 crosslink centers only in 3UTR
+top100c=myxlc %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(100) ## strictly 3'UTR sites
+
+#get their sequence, because peak length is too variable, we rather get window around XL center again
+## take window of 51 so that xl site is in the middle
+mywindow=51
+top100cseq=RNAStringSet(x = getSeq(plyranges::mutate(width = mywindow, anchor_center(top100c))
+                                   ,x=FaFile(hg19)))
+## sanity check that centers are all U
+#RNAStringSet(x = getSeq(top100c,x=FaFile(hg19))) %>% unique ## should be only U
+## now the center is (hopefully) always 26
+#subseq(top100cseq,26,26) %>% unique()
+
+## how many sequences
+topn=length(top100c)
+
+## construct data frame for plotting
+df=expand_grid(x=1:topn,y=1:mywindow) ## x: gene, y: nucleotide
+df$gene=expand_grid(gene=top100c$name,y=1:mywindow)$gene
+df$nt=as.character(top100cseq) %>% strsplit("") %>% unlist #nucleotide
+
+
+## select top N k-mers, this time include CPEs
+topk=20
+km1=forggall %>% 
+  #.[!.$canonical_CPE,] %>%
+  .[order(-.$DMSO_ratio),] %>% head(20) %>% .$kmer
+# km2=forggall %>% 
+#   #.[!.$canonical_CPE,] %>% 
+#   .[order(-.$RMD_ratio),] %>% head(20) %>% .$kmer
+## only DMSO because we show DMSO sites
+#topkmers=subset(forggall,kmer%in%c(km1,km2))
+topkmers=subset(forggall,kmer%in%c(km1))
+## 1. define A and U rich as having >=4 A/U in top N
+Arich=topkmers[which( (topkmers$kmer %>% str_count(.,"A") ) >=4 ),]
+Urich=topkmers[which( (topkmers$kmer %>% str_count(.,"U") ) >=4 ),]
+
+## locate the kmers in our sequences
+## this function returns additional dataframes for k-mers to be input into ggplot
+locate_kmers=function(kmer_regex="AAUAAA",top100cseq,top100c){
+  pas=stringr::str_locate_all(as.character(top100cseq),kmer_regex)
+  names(pas)=top100c$name
+  pasdf=data.frame(start=unlist(lapply(pas, function(x) return(x[,"start"])))
+                   ,end=unlist(lapply(pas, function(x) return(x[,"end"]))))
+  ## anywhere with more than 1 match there is numbering just after the name
+  id1=match(
+    sub("@.+","",sub(".start|[0-9]+$","",rownames(pasdf)))
+    ,sub("@.+","",df$gene)
+  )
+  pasdf$x=df[id1,]$x
+  return(pasdf)
+}
+
+##locate A-rich and U-rich kmers
+adf=locate_kmers(kmer_regex=paste0(Arich$kmer,collapse = "|")
+                 ,top100c=top100c
+                 ,top100cseq=top100cseq)
+udf=locate_kmers(kmer_regex=paste0(Urich$kmer,collapse = "|")
+                 ,top100c=top100c
+                 ,top100cseq=top100cseq)
+
+# ## CPEs
+# cpedf=locate_kmers(kmer_regex=paste0(cpes$kmer,collapse = "|")
+#                  ,top100c=top100c
+#                  ,top100cseq=top100cseq)
+
+##Plot
+
+top100pl=
+suppressWarnings(
+  
+  ggplot(df)+
+  geom_rect(aes(xmin=y-1,xmax=y
+                ,ymin=topn-x,ymax=topn-x+1)
+            ,fill="white"
+  )+
+  ## A rich
+  geom_rect(data=adf,
+            aes(xmin=start-1,xmax=end, ymin=topn-x,ymax=topn-x+1
+                ,fill="A-rich"
+            ))+
+  ## U rich
+  geom_rect(data=udf,
+            aes(xmin=start-1,xmax=end,ymin=topn-x,ymax=topn-x+1
+                ,fill="U-rich"
+            ))+
+  # ## CPEs
+  # geom_rect(data=cpedf,
+  #           aes(xmin=start-1,xmax=end,ymin=topn-x,ymax=topn-x+1
+  #               ,fill="CPE"
+  #           ))+
+  scale_y_discrete(limits=seq(0.5,99.5,1)#levels(factor(1:topn))
+                 ,labels = rev(top100c$name) %>% sub("@ctrl","",.)
+  )+ 
+  theme(axis.text.y = element_text(size=6))+
+  geom_vline(xintercept = c(25,26))+
+  labs(x="nucleotide",y="gene"
+       , title="kmer positions of top 100 genes in 3'UTRs"
+       , fill="6-mers"
+  )+
+  scale_fill_manual(values = c("darkred","darkcyan"
+                               #,"darkblue"
+                               )
+                    ,labels=c("A-rich","U-rich"
+                              #,"CPE"
+                              ))+
+  scale_x_discrete(limits=seq(from = 0.5,to = 50.5,by = 5), labels=seq(from = -25,to = 25,by = 5))+
+  NULL
+)
+
+#write.csv()
+save_plot(file.path(plotdir,"Fig_SXX_4E.pdf"),base_asp = 0.618, base_height = 7, top100pl)
 
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
@@ -420,8 +544,12 @@ rcasinputr=plyranges::mutate(width = mywindow, anchor_center(myxlr)) %>% subsetB
 utrs <- txdbFeatures$threeUTRs
 common_utrs <- utrs[intersect(queryHits(findOverlaps(utrs, rcasinputc)),
                               queryHits(findOverlaps(utrs, rcasinputr)))]
-dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc, targetRegionsList = list('common'=common_utrs))
-dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr, targetRegionsList = list('common'=common_utrs))
+
+
+dcvgListc <- RCAS::calculateCoverageProfileList(queryRegions =  rcasinputc %>% subsetByOverlaps(common_utrs, type = "within") %>% head(3500)
+                                                , targetRegionsList = list('common'=common_utrs))
+dcvgListr <- RCAS::calculateCoverageProfileList(queryRegions = rcasinputr %>% subsetByOverlaps(common_utrs, type = "within") %>% head(3500)
+                                                , targetRegionsList = list('common'=common_utrs))
 
 dcvgListc$condition="DMSO"
 dcvgListr$condition="RMD"
@@ -430,14 +558,14 @@ dcvgListr$condition="RMD"
 rcaspl=ggplot2::ggplot(rbind(dcvgListc,dcvgListr),aes(x = bins, y = meanCoverage)) + 
   geom_ribbon(aes(fill=condition,ymin = meanCoverage - standardError * 1.96, ymax = meanCoverage + standardError * 1.96)) + 
   geom_line(aes(color = condition)) + theme_classic2() +
-  labs(y="CPEB4 sites \n mean coverage in 3'UTR",x=" relative 3'UTR length (%)",title="")+
+  labs(y="Top 3500 CPEB4 sites \n mean coverage in 3'UTRs",x=" relative 3'UTR length (%)",title="")+
   scale_fill_manual(values = c(alpha("blue",.1),alpha("red",.1)))+
   scale_color_manual(values = c("darkblue","darkred"))+
   theme(aspect.ratio = 1)+
   NULL
 rcaspl
 
-write_csv(rbind(dcvgListc,dcvgListr), file=file.path(resultdir,"Fig_4C.csv"))
+write_csv(rbind(dcvgListc,dcvgListr), file=file.path(resultdir,"source_data/Fig_4C.csv"))
 
 save_plot(file.path(plotdir,"Fig_4C.pdf"),rcaspl)
 
@@ -512,7 +640,7 @@ pabpdistPlot <-
 pabpdistPlot
 
 ## source data
-mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file=file.path(resultdir,"Fig_4F.csv"))
+mypabp1%>%rename(MedianDistanceToPABP=med)%>%write_csv(file=file.path(resultdir,"source_data/Fig_4F.csv"))
 
 save_plot(file.path(plotdir,"Fig_4F.pdf"),pabpdistPlot)
 
@@ -527,7 +655,7 @@ hlraw <- read.csv("data/half_lives/hl_norm_to_ERCC92.csv"
   dplyr::filter(!grepl("^ERCC-",.$X))
 ## add diagnostic events and target groups
 hlraw$DEs <- target_genes$sumDEPerGene[match(hlraw$X,target_genes$gene_names)]
-hlraw$target_group <- Hmisc::cut2(x = hlraw$DEs,cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("46027\\]","more",.)%>%gsub("\\,","\\-",.)%>%forcats::fct_explicit_na(., "nontarget")
+hlraw$target_group <- Hmisc::cut2(x = hlraw$DEs,cuts = mycuts)%>%gsub("\\[| ","",.)%>%gsub("10\\)","9",.)%>%gsub("100\\)","99",.)%>%gsub("1000\\)","999",.)%>%gsub("5000\\)","4999",.)%>%gsub("5000.+","5000,more",.)%>%gsub("\\,","\\-",.)%>%forcats::fct_explicit_na(., "nontarget")
 ## add ARE
 hlraw$ARE <- ifelse(hlraw$X%in%AREdb$GeneName, "ARE", "non-ARE")
 ## add IEG
@@ -552,7 +680,7 @@ fab_half <- hlraw%>%
 
 ### source data
 
-write_csv(fab_half, file=file.path(resultdir,"Fig_5DE_S7C.csv"))
+write_csv(fab_half, file=file.path(resultdir,"source_data/Fig_5DE_S7C.csv"))
 
 
 ##################### 5A: violin plots for half-lives ###################
@@ -581,7 +709,7 @@ phl <-
 
 phl
 
-write_csv(hl2, file = file.path(resultdir,"Fig_5A.csv"))
+write_csv(hl2, file = file.path(resultdir,"source_data/Fig_5A.csv"))
 
 save_plot(file.path(plotdir,"Fig_5A.pdf"),phl)
 
@@ -674,11 +802,13 @@ gsea_df$leadingEdge=unlist(lapply(fgseaRes$leadingEdge,function(x) paste(x,colla
 
 ggsea
 
-write_csv(gsea_df%>%.[order(.$padj),], file=file.path(resultdir,"Fig_5F.csv"))
+write_csv(gsea_df%>%.[order(.$padj),], file=file.path(resultdir,"source_data/Fig_5F.csv"))
 
 save_plot(file.path(plotdir,"Fig_5F.pdf"),ggsea)
 
-################################ 5G: example genome browser shots #############################################
+################################ Fig 5G: example genome browser shots #############################################
+
+message("plotting gviz screenshots... can crash!")
 
 ## need font otherwise error saving figure
 loadfonts(device = "postscript")
@@ -694,26 +824,57 @@ options(ucscChromosomeNames=FALSE)
 #library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
 sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
 
-### clip tracks
-#cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
-#                              #,stacking = "hide"
-#                              , fontfamily="Arial",fontfamily.title="Arial"
-#                              , referenceSequence=sTrack
-#)
-#cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
-#                              , fontfamily="Arial",fontfamily.title="Arial"
-#                              , referenceSequence=sTrack
-#)
-#
-#rename tracks easily
-#cliptrack1@name <- "CLIP r1"
-#cliptrack2@name <- "CLIP r2"
-
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
-mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
-grtrack <- GeneRegionTrack(
-  mytxdb
+# mytxdb <- loadDb(file.path(ann_dir,"mytxdb.RData"))
+# grtrack <- GeneRegionTrack(
+#   mytxdb
+#   , fill="darkblue"
+#   , collapseTranscripts="longest" ## show "meta" transcript to save space
+#   ,fontfamily = myfont 
+#   ,fontfamily.group = myfont 
+#   ,fontfamily.title = myfont 
+# )
+
+## CLIP coverage from bam
+cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+                              ,col.deletion="darkred"
+)
+cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
+                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, referenceSequence=sTrack
+                              ,type="coverage"
+)
+
+## CLIP coverage and diagnostic events tracks from bigwig
+DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4SU_DMSO_DEs.plus.bw")
+                      , genome = "hg19"
+                      ,type="histogram"
+                      ,name = "DEs p32"
+                      ,col.histogram = "darkblue")
+
+DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
+                      , genome = "hg19"
+                      ,type="histogram"
+                      ,name = "DEs ir")
+
+
+## overlay conversions and coverage (the scale is not the same!!!)
+
+ot1 <- OverlayTrack(trackList=list(cliptrack1,DEtrack1), name="coverage and DEs p32") ## coverage from bam does not show deletions
+
+
+## need JUNB,FOS,EGR1
+goi=c("EGR1","FOS","JUNB")
+
+## smaller gene track with only intereting genes
+load(file.path(ann_dir,"gtf.RData"))
+smTxdb=makeTxDbFromGRanges(subset(gtf, gene_name%in%goi))
+smgrtrack <- GeneRegionTrack(
+  smTxdb
   , fill="darkblue"
   , collapseTranscripts="longest" ## show "meta" transcript to save space
   ,fontfamily = myfont 
@@ -722,41 +883,92 @@ grtrack <- GeneRegionTrack(
 )
 
 
-## need JUNB,FOS,EGR1
 # just look up coordinates by hand
-mygenes <- data.frame(row.names = c("EGR1","FOS","JUNB"),
-                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
+ylims=c(10,50,300) ## set up manually
+
+mygenes <- data.frame(row.names = goi,
+                      gene=factor(goi,levels=c("EGR1","FOS","JUNB")),
                       chr=c("chr5","chr14","chr19"),
                       afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204))
+                      ato=c(137805547,75749523,12905204),
+                      ylims=ylims)
+
 igvs <- 
-  xyplot(1 ~ gene | gene, data = 
-           data.frame(row.names = c("EGR1","FOS","JUNB"),
-                      gene=factor(c("EGR1","FOS","JUNB"),levels=c("EGR1","FOS","JUNB")),
-                      chr=c("chr5","chr14","chr19"),
-                      afrom=c(137800454,75744708,12901667),
-                      ato=c(137805547,75749523,12905204)), #par.settings=list(axis.text=list(fontfamily="Comic Sans MS")),
+  xyplot(1 ~ gene | gene, data = mygenes,
          panel = function(x) {
            afrom=mygenes$afrom[x]
            ato=mygenes$ato[x]
            chr=mygenes$chr[x]
-           plotTracks(c(cliptrack1 ,cliptrack2, grtrack),from = afrom,to = ato,chromosome = chr,type="coverage",showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
-                      main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             #ot1 #, ot2
+             cliptrack1
+             ,cliptrack2,smgrtrack),from = afrom,to = ato,chromosome = chr
+             #,ylim=c(0,ylim)
+             #,type="coverage"
+             ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
+             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
          }
          , layout=c(3,1)
          , scales = list(draw = FALSE)
          , xlab = NULL, ylab = NULL)
 ## be careful! if not full screen there wont be enough place and will get weird viewport error
+#igvs
 
 fig5g=plot_grid(igvs)
 
-fig5g
+#fig5g
 
 save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
 
 ### new panel to zoom in
 
-## need bed track
+## make new zoomed in coordinates
+for(mygene in goi){
+  ## get highest scoring cluster
+  myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
+  #chr=seqnames(myclus)@values
+  ## plot not cluster borders, but a window around crosslink
+  mywindow=100
+  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
+  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
+  
+}
+
+igvs2 <- 
+  xyplot(1 ~ gene | gene, data = mygenes,
+         panel = function(x) {
+           afrom=mygenes$afrom2[x]
+           ato=mygenes$ato2[x]
+           chr=mygenes$chr[x]
+           ylim=mygenes$ylims[x]
+           plotTracks(c(
+             ot1 
+             #ot2
+             #,cliptrack1
+             #,cliptrack2,
+             #,DEtrack1
+             #,covTrack1
+             , smgrtrack
+             , sTrack
+           ),from = afrom,to = ato,chromosome = chr
+           ,ylim=c(0,ylim)
+           #,type="coverage"
+           ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(3,.1,.1),
+           main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+         }
+         , layout=c(1,3)
+         , scales = list(draw = FALSE)
+         , xlab = NULL, ylab = NULL)
+
+#igvs2
+
+fig_5g_suppl=plot_grid(igvs2)
+
+#fig_5g_suppl
+
+save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 15,  fig_5g_suppl)
+
 
 
 ########### Fig S5 ##########
@@ -791,7 +1003,7 @@ pairs(logCnt%>%.[,4:6], lower.panel = panel.smooth, upper.panel = panel.cor,
       gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
 p_repr_r <- recordPlot() 
 
-write.csv(as.data.frame(logCnt), file = "data/source_data/Fig_S5D.csv")
+write.csv(as.data.frame(logCnt), file = file.path(resultdir, "source_data/Fig_S5D.csv"))
 
 save_plot(file.path(plotdir,"Fig_S5D.pdf"),plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
 
@@ -808,9 +1020,11 @@ plot.new()
 
 TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
 
-write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file="data/source_data/Fig_S5E.csv")
+write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file=file.path(resultdir, "source_data/Fig_S5E.csv"))
 
-save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl, base_height = 4, base_width = 8)
+save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl
+          , base_height = 4, base_width = 8
+          )
 
 ############# S5F: full transcript categories barplot ###########
 
@@ -832,7 +1046,7 @@ pbar <-
 
 pbar
 
-write_csv(mybar, file="data/source_data/Fig_S5F.csv")
+write_csv(mybar, file=file.path(resultdir, "source_data/Fig_S5F.csv"))
 
 save_plot(file.path(plotdir,"Fig_S5F.pdf"),pbar)
 
@@ -869,17 +1083,10 @@ ggscat <-
 
 ggscat
 
-write_csv(m1, file="data/source_data/Fig_S6A.csv")
+write_csv(m1, file=file.path(resultdir, "source_data/Fig_S6A.csv"))
 
 save_plot(file.path(plotdir,"Fig_S6A.pdf"),ggscat)
 
-##################### S6B: motif heatmap for RMD #######################
-
-## run the code for main Fig 4E first
-fullheatr=plot_grid(pwmr,heatr, rel_widths = c(1,3))
-fullheatr
-write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file="data/source_data/Fig_S6B.csv")
-save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
 
 ########### Fig S7 ##########
 
@@ -935,7 +1142,7 @@ bpstar <-
 
 bpstar
 
-write_csv(hl4, file = "data/source_data/Fig_S7B.csv")
+write_csv(hl4, file = file.path(resultdir, "source_data/Fig_S7B.csv"))
 
 save_plot(file.path(plotdir,"Fig_S7B.pdf"),bpstar)
 
@@ -955,7 +1162,57 @@ ggsiARE <-
 ggsiARE
 save_plot(file.path(plotdir,"Fig_S7C.pdf"),ggsiARE)
 
+######################### final gene target table  S6 ###########################
 
+## add IEG and half-life fold change information to the target genes table
+## Note: for the figures, we selected information for both DMSO and RMD conditions.
+## However, for the text, we select DMSO only (that gives us 102 genes instead of 88).
+## so we refilter and recalculate log2FC, now only DMSO condition
+fab_half2 <- hlraw%>%
+  dplyr::select(X,
+                condHeLa_S140_DMSO_rep1_hl,
+                condHeLa_S181_DMSO_rep1_hl,
+                condHeLa_C2_DMSO_rep1_hl,
+                condHeLa_DMSO_rep1_hl,
+                condHeLa_S140_DMSO_rep1_R2,
+                condHeLa_S181_DMSO_rep1_R2,
+                condHeLa_C2_DMSO_rep1_R2,
+                condHeLa_DMSO_rep1_R2,
+                IEG,target_group
+  )%>%
+  filter_at(vars(ends_with("_R2")), all_vars(.>=0.5))%>%
+  filter_at(vars(ends_with("_hl")), all_vars(.>=0))%>%
+  mutate(mean_siCPEB4_DMSO=rowMeans(dplyr::select(., condHeLa_S140_DMSO_rep1_hl, condHeLa_S181_DMSO_rep1_hl)),
+         mean_Ctrl_DMSO=rowMeans(dplyr::select(., condHeLa_C2_DMSO_rep1_hl, condHeLa_DMSO_rep1_hl)),
+         meanlogFC_DMSO=log2(mean_siCPEB4_DMSO/mean_Ctrl_DMSO),
+         mutate(across(.cols = starts_with("mean_"),.fns = list(log2=log2)))) ##for scatterplot need log2
+
+## how many IEG have half-lifes, are in the top group (>1000 DEs) and how many upregulated >= 1.5 fold?
+
+message("total IEGs with half-lives: ",
+        sum(fab_half2$IEG=="IEG"))
+##102
+message("Out of IEGs with half-lives, strong targets (>=1000 DEs): ",
+        nrow(subset(fab_half2, IEG=="IEG" & target_group%in%c("5000-more","1000-4999"))))
+##29
+message("Out of IEGs with half-lives and strong targets (>=1000 DEs), stabilized 1.5x: ",
+        sum(subset(fab_half2, IEG=="IEG" & target_group%in%c("5000-more","1000-4999"))$meanlogFC_DMSO>log2(1.5))
+        )
+##19
+
+
+
+########
+
+# ## even if one of the overlapping genes is IEG it will be TRUE here
+# target_genes$IEG=as.logical(unlist(lapply(target_genes$gene_names %>% strsplit(";"), function(x) sum(x%in%fantom_ieg$Hs_symbol))))
+# 
+# ## foldchange: we can only assign to unambiguous target genes - or we collapse it again, but then it is not numeric, so this table is not for plotting, but for visual inspection only!
+# target_genes$meanlog2FC_hl_DMSO=unlist(lapply(target_genes$gene_names %>% strsplit(";"), function(x) paste(round(fab_half$meanlogFC_DMSO[fab_half$X%in%x],2),collapse=";")))
+# 
+# ## final table of target genes
+# ## this is also the Supplementary table S6
+# write.csv(target_genes, file = file.path(resultdir,"table_S6_cpeb4_target_genes.csv"), row.names = F) 
 
 
 
