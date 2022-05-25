@@ -18,6 +18,7 @@ mypackages <- c("plyranges"
                 ,"rtracklayer"
                 ,"Rsamtools"
                 ,"rio"
+		,"data.table"
 )
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}

@@ -43,6 +43,7 @@ mypackages <- c("config" ## careful it masks "merge"!!
                 ,"magick"
                 ,"rio"
                 ,"extrafont"
+		,"data.table"
 )
 
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
