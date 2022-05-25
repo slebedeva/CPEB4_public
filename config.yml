@@ -6,6 +6,7 @@ default:
   resultdir: "results"
   plotdir: "plots"
   scriptdir: "scripts"
+#  threads: 4
 
 ## to activate alternative environment: `Sys.setenv(R_CONFIG_ACTIVE = "old_DE")`
 old_DE:

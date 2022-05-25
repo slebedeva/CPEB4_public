@@ -67,6 +67,7 @@ datadir=config$datadir ##data
 ann_dir=config$ann_dir ##annotation
 scriptdir=config$scriptdir ##scripts
 resultdir=config$resultdir ## results
+#threads=config$threads
 
 lapply(c(plotdir,ann_dir,resultdir, file.path(resultdir,"source_data")), function(x) if(! dir.exists(x)){dir.create(x)})
 
@@ -855,12 +856,12 @@ barplot(colSums(rmd[,8:27]),main="RMD",las=2)
 pTC2 <- recordPlot()
 plot.new()
 
-TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.7)
+TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.8)
 
 write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file=file.path(resultdir, "source_data/Fig_S5E.csv"))
 
 save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl
-          , base_height = 4, base_width = 8
+          , base_height = 6, base_width = 10
           )
 
 ############# S5F: full transcript categories barplot ###########
@@ -1149,7 +1150,7 @@ igvs <-
            afrom=mygenes$afrom[x]
            ato=mygenes$ato[x]
            chr=mygenes$chr[x]
-           ylim=mygenes$ylims[x]
+           #ylim=mygenes$ylims[x]
            plotTracks(c(
              #ot1 #, ot2
              cliptrack1
@@ -1157,7 +1158,7 @@ igvs <-
              #,ylim=c(0,ylim)
              #,type="coverage"
              ,showId = F, geneSymbol=F,cex = 0.5, sizes = c(1,1,.1),
-             main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
+             main = paste0(chr,":",afrom,"-",ato), cex.main=0.6, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
          }
          , layout=c(3,1)
          , scales = list(draw = FALSE)
