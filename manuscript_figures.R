@@ -2,35 +2,50 @@
 
 ## working dir is where this source file is (rstudio only)
 #basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
-basedir="."
+basedir=getSrcDirectory(function(x) {x})
 setwd(basedir)
 message("your working directory is: ", getwd())
+
+
+## get values
+config=config::get()
+
+plotdir=config$plotdir ##Plots
+datadir=config$datadir ##data
+ann_dir=config$ann_dir ##annotation
+scriptdir=config$scriptdir ##scripts
+resultdir=config$resultdir ## results
+#threads=config$threads
+Rlibdir=config$Rlibdir
+
+.libPaths(Rlibdir)
+
 message("your libraries are in: ", paste(.libPaths(), collapse = "; "))
+
 
 ###################################################### load environment ########################################################################################
 
 ## important! otherwise Hs.org.db fails ##https://support.bioconductor.org/p/9136239/#9136319
 options(connectionObserver = NULL)
 
-mypackages <- c("config"
+mypackages <- c("devtools"
+                ,"config"
                 ,"plyranges"
                 ,"tidyverse"
                 ,"reshape2"
+                ,"data.table"
                 ,"Hmisc"
                 ,"magrittr"
                 ,"ggplot2"
                 ,"ggrepel"
                 ,"ggpubr"
-                ,"ggunchained"
                 ,"lattice"
-                ,"DESeq2"
                 ,"Biostrings"
                 ,"GenomicRanges"
                 ,"GenomicFeatures"
                 ,"rtracklayer"
                 ,"Rsamtools"
                 ,"motifStack"
-                ,"Gviz"
                 ,"ellipse"
                 ,"BSgenome.Hsapiens.UCSC.hg19"
                 ,"genomation"
@@ -42,7 +57,10 @@ mypackages <- c("config"
                 ,"magick"
                 ,"rio"
                 ,"extrafont"
-                )
+                ,"ggunchained"
+                ,"DESeq2"
+                ,"Gviz"
+)
 
 #### try to install missing packages if any (can easily fail) #####
 to_install=mypackages[!mypackages%in%installed.packages()]
@@ -51,23 +69,18 @@ if(length(to_install)>0){
   message("missing packages: ", paste(to_install,collapse=", "), "\ntrying to install...")
   BiocManager::install(pkgs = to_install,update = FALSE, ask = FALSE)
   failed=mypackages[!mypackages%in%installed.packages()]
-  message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")
+  ## ggunchained separately (not in Bioc) github
+  if("ggunchained"%in%failed){devtools::install_github("JanCoUnchained/ggunchained")}
 }
+
+failed=mypackages[!mypackages%in%installed.packages()]
+if(length(failed)>0){message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")}
 
 pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, character.only=T)))
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
 
 ########## paths and directories ############
 
-## get values
-config=config::get()
-
-plotdir=config$plotdir ##Plots
-datadir=config$datadir ##data
-ann_dir=config$ann_dir ##annotation
-scriptdir=config$scriptdir ##scripts
-resultdir=config$resultdir ## results
-#threads=config$threads
 
 lapply(c(plotdir,ann_dir,resultdir, file.path(resultdir,"source_data")), function(x) if(! dir.exists(x)){dir.create(x)})
 
@@ -1000,7 +1013,7 @@ ggsiARE <-
 ggsiARE
 save_plot(file.path(plotdir,"Fig_S7C.pdf"),ggsiARE)
 
-######################### final gene target table  S6 ###########################
+######################### final gene target tables suppl file S7,S10 ###########################
 
 ## add IEG and half-life fold change information to the target genes table
 ## Note: for the figures, we selected information for both DMSO and RMD conditions.
@@ -1037,6 +1050,14 @@ message("Out of IEGs with half-lives and strong targets (>=1000 DEs), stabilized
         sum(subset(fab_half2, IEG=="IEG" & target_group%in%c("5000-more","1000-4999"))$meanlogFC_DMSO>log2(1.5))
         )
 ##19
+
+## write final supplementary table
+
+## here we do not filter for R2 anymore but output all raw data
+
+ieg_table=left_join(subset(hlraw,IEG=="IEG"), target_genes, by = c("X"="gene_names"))
+
+write.csv(ieg_table, file=file.path(resultdir,"table_s10_iegs.csv"))
 
 ################################ Fig 5G: example genome browser shots #############################################
 
