@@ -42,6 +42,7 @@ if(!(file.exists(hg19))){
   message("Downloading hg19 genome....")
   system("wget http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/GRCh37.p13.genome.fa.gz")
   system("gunzip -c GRCh37.p13.genome.fa.gz | bgzip  > GRCh37.p13.genome.fa.bgz")
+  file.rename(from="GRCh37.p13.genome.fa.bgz",to=hg19)
 }
 
 
@@ -51,10 +52,11 @@ if(!(file.exists(hg19))){
 if(!file.exists(file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))){
   message("Downloading Gencode 19 annotation...")
   system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
-  system(paste("mv gencode.v19.annotation.gtf.gz", ann_dir))}
-gtf <- rtracklayer::import(con = "gencode.v19.annotation.gtf.gz")
+  file.rename(from="gencode.v19.annotation.gtf.gz", to=file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))
+gtf <- rtracklayer::import(con = file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))
 canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
 ## gene2name
+remove_dots=function(x){sub("\\.[0-9]+","",x)}
 gene2name <- unique(data.frame(gene_id = remove_dots(gtf$gene_id), gene_name=gtf$gene_name, gene_status=gtf$gene_status, gene_type=gtf$gene_type, stringsAsFactors = F))
 tx2name <- with(subset(gtf, type=="transcript"), unique(data.frame(transcript_id, gene_name, stringsAsFactors = F)))
 

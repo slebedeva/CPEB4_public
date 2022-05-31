@@ -1,9 +1,8 @@
 #### make figures for CPEB4 manuscript
 
-## working dir is where this source file is (rstudio only)
-#basedir <- dirname(rstudioapi::getSourceEditorContext()$path)
-basedir=getSrcDirectory(function(x) {x})
-setwd(basedir)
+## working dir
+#basedir=tcltk::tk_choose.dir(caption='choose working directory')
+#setwd(basedir)
 message("your working directory is: ", getwd())
 
 
@@ -15,7 +14,9 @@ datadir=config$datadir ##data
 ann_dir=config$ann_dir ##annotation
 scriptdir=config$scriptdir ##scripts
 resultdir=config$resultdir ## results
-#threads=config$threads
+
+if(is.null(config$Rlibdir)){stop('Please run install_packages.R first!')}
+
 Rlibdir=config$Rlibdir
 
 .libPaths(Rlibdir)

@@ -1,3 +1,11 @@
+## propmt user to choose directory because config may be not there yet
+libdir=tcltk::tk_choose.dir(caption='Choose directory for R libraries (double click)')
+.libPaths(libdir)
+
+tcltk::tkmessageBox(message=paste("Do you want to proceed installing into ",.libPaths()[1],"?"),type="okcancel")
+
+message('your librariy path: ',.libPaths()[1])
+
 mypackages <- c("devtools"
 		,"config"
 		,"plyranges"
@@ -46,5 +54,16 @@ if(length(to_install)>0){
 }
 
 failed=mypackages[!mypackages%in%installed.packages()]
-if(length(failed)>0){message("failed to install: ", paste(failed,collapse=", "), "\nanyway proceeding...")}
+if(length(failed)>0){message("Failed to install: ", paste(failed,collapse=", "), "\nAnyway proceeding...")}
 
+if(length(failed)==0){message('All packages successfully installed!')}
+
+config=config::get()
+
+if(is.null(config$Rlibdir)){
+	message('Adding your library path to config...')
+	command=paste0('echo ','\'', '  Rlibdir: ', libdir, '\'', ' >> config.yml')
+	system(command)
+	file.create(".Rprofile")
+	writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=".Rprofile")
+}

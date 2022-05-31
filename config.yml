@@ -6,12 +6,3 @@ default:
   resultdir: "results"
   plotdir: "plots"
   scriptdir: "scripts"
-  Rlibdir: "R_libraries"
-
-#  threads: 4
-
-## to activate alternative environment: `Sys.setenv(R_CONFIG_ACTIVE = "old_DE")`
-old_DE:
-  resultdir: "results_oldDEMaxTC"
-  plotdir: "plots_oldDEMaxTC"
-
