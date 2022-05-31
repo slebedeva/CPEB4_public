@@ -1,8 +1,8 @@
 default:
-  genome: "annotation/GRCh37.p13.genome.fa.bgz"
+  genome: annotation/GRCh37.p13.genome.fa.bgz
   global_size: 14
-  ann_dir: "annotation"
-  datadir: "data"
-  resultdir: "results"
-  plotdir: "plots"
-  scriptdir: "scripts"
+  ann_dir: annotation
+  datadir: data
+  resultdir: results
+  plotdir: plots
+  scriptdir: scripts
