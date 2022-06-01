@@ -846,13 +846,18 @@ logCnt=log10(counts(ddscl)+1)
 colnames(logCnt)%<>%paste0(.,"_log10_p1")
 
 ## record plots as objects for ctrl and RMD
+## be careful with the order of bam files!
+c_cols=colnames(logCnt)%>%.[!grepl("RMD",.)]
+c_lbl=c_cols%>%sub("_.+","",.)%>%sub("CPEB4","p32",.)%>%sub("Ctrl","ir",.)
+r_cols=colnames(logCnt)%>%.[grepl("RMD",.)]
+r_lbl=r_cols%>%sub("_.+","",.)%>%sub("CPEB4","p32",.)%>%sub("RMD","ir",.)
 plot.new()
-pairs(logCnt%>%.[,1:3], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
+pairs(logCnt%>%.[,c_cols], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE, labels = c_lbl)
 p_repr_c <- recordPlot()
 plot.new()
-pairs(logCnt%>%.[,4:6], lower.panel = panel.smooth, upper.panel = panel.cor,
-      gap=0, row1attop=FALSE, labels = c("ir","ir","p32"))
+pairs(logCnt%>%.[,r_cols], lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE, labels = r_lbl)
 p_repr_r <- recordPlot() 
 
 write.csv(as.data.frame(logCnt), file = file.path(resultdir, "source_data/Fig_S5D.csv"))
@@ -907,7 +912,7 @@ save_plot(file.path(plotdir,"Fig_S5F.pdf"),pbar)
 ######################## S6A: DESeq foldhcange RNA-seq vs CLIP ##############################
 
 ## load previously calculated DEseq objects for RNA and CLIP 
-load("data/DEseq.RData") 
+load(file.path(resultdir, "DEseq.RData")) 
 ## do not use log fold change shrinkage, merge RNA and CLIP fold changes and plot against each other
 unshrunk1 <- data.frame(results(dds, name="condition_R_vs_C"))
 unshrunkcl1 <- data.frame(results(ddscl, name="condition_R_vs_C"))

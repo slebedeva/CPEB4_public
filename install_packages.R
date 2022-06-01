@@ -1,5 +1,5 @@
 ## propmt user to choose directory because config may be not there yet
-libdir=tcltk::tk_choose.dir(caption='Choose directory for R libraries (double click)')
+libdir=tcltk::tk_choose.dir(caption="Choose directory for R libraries (double click)" )
 .libPaths(libdir)
 
 tcltk::tkmessageBox(message=paste("Do you want to proceed installing into ",.libPaths()[1],"?"),type="okcancel")
@@ -37,6 +37,7 @@ mypackages <- c("devtools"
 		,"data.table"
                 ,"ggunchained"
                 ,"DESeq2"
+		,"apeglm"
                 ,"Gviz"
                 )
 
