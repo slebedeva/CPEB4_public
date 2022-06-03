@@ -8,7 +8,13 @@
 #setwd(basedir)
 message("your working directory is: ", getwd())
 
-if(!require('config')){stop('Please run install_packages.R first!')}
+Rprofile='CPEB4.Rprofile'
+if(!file.exists(Rprofile)){stop('Please run install_packages.R first!')}
+
+
+#if(!require('config')){stop('Please run install_packages.R first!')}
+
+source(Rprofile)
 
 ## get values
 config=config::get()
@@ -21,9 +27,8 @@ resultdir=config$resultdir ## results
 
 if(is.null(config$Rlibdir)){stop('Please run install_packages.R first!')}
 
-Rlibdir=config$Rlibdir
-
-.libPaths(Rlibdir)
+#Rlibdir=config$Rlibdir
+#.libPaths(Rlibdir)
 
 message("your libraries are in: ", paste(.libPaths(), collapse = "; "))
 

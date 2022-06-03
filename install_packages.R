@@ -1,8 +1,14 @@
+## I just create library directory here
+libdir='R_libraries'
+if(!dir.exists(libdir)){dir.create(libdir)}
+
 ## propmt user to choose directory because config may be not there yet
-libdir=tcltk::tk_choose.dir(caption="Choose directory for R libraries (double click)" )
+#message("Double click to choose directory for R libraries")
+#libdir=tcltk::tk_choose.dir(caption="Double click to choose directory for R libraries" )
+
 .libPaths(libdir)
 
-tcltk::tkmessageBox(message=paste("Do you want to proceed installing into ",.libPaths()[1],"?"),type="okcancel")
+tcltk::tkmessageBox(message=paste("I will proceed installing into ",.libPaths()[1]),type="ok")
 
 message('your librariy path: ',.libPaths()[1])
 
@@ -65,8 +71,12 @@ if(is.null(config$Rlibdir)){
 	message('Adding your library path to config...')
 	command=paste0('echo ','\'', '  Rlibdir: ', libdir, '\'', ' >> config.yml')
 	system(command)
-	# if(!file.exists(".Rprofile")){
-	#   file.create(".Rprofile")
-	#   writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=".Rprofile")
-	#   }
 }
+
+## create R profile file too
+
+Rprofile="CPEB4.Rprofile"
+if(!file.exists(Rprofile)){
+	   file.create(Rprofile)
+	   writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=Rprofile)
+	   }
