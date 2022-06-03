@@ -1,10 +1,14 @@
 #### make figures for CPEB4 manuscript
 
 ## working dir
+#rstudio
+#basedir=dirname(rstudioapi::getActiveDocumentContext()$path)
+#interactive
 #basedir=tcltk::tk_choose.dir(caption='choose working directory')
 #setwd(basedir)
 message("your working directory is: ", getwd())
 
+if(!require('config')){stop('Please run install_packages.R first!')}
 
 ## get values
 config=config::get()
@@ -60,6 +64,7 @@ mypackages <- c("devtools"
                 ,"extrafont"
                 ,"ggunchained"
                 ,"DESeq2"
+                ,"apeglm"
                 ,"Gviz"
 )
 
@@ -88,7 +93,7 @@ lapply(c(plotdir,ann_dir,resultdir, file.path(resultdir,"source_data")), functio
 
 ## folder for R scripts
 ## warning if cannot find scripts
-if(! dir.exists(scriptdir)){message("cannot find scripts, please check your scripts directory path in the config file!")}
+if(! dir.exists(scriptdir)){stop("cannot find scripts, please check your scripts directory path in the config file!")}
 
 
 

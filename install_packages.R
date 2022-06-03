@@ -65,6 +65,8 @@ if(is.null(config$Rlibdir)){
 	message('Adding your library path to config...')
 	command=paste0('echo ','\'', '  Rlibdir: ', libdir, '\'', ' >> config.yml')
 	system(command)
-	file.create(".Rprofile")
-	writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=".Rprofile")
+	# if(!file.exists(".Rprofile")){
+	#   file.create(".Rprofile")
+	#   writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=".Rprofile")
+	#   }
 }

@@ -22,7 +22,7 @@ pl=suppressWarnings(suppressPackageStartupMessages(lapply(mypackages, require, c
 if(sum(!unlist(pl))){message("failed to load: \n",paste(mypackages[!unlist(pl)],collapse = "\n"), "\nanyway proceeding...")}
 
 
-## we depend on results wfrom this script
+## we depend on results from this script
 if(!file.exists(file.path(resultdir,"bed_reduced.RData"))){source(file.path(scriptdir,"process_CLIP_peaks.R"))}
 
 
@@ -38,7 +38,7 @@ rnaseq <- lapply(fabian_rnaseq, function(x) {
   y <- y[,4, drop=F]
   return(y)})
 rnaseqcnt <- do.call(cbind, rnaseq)
-colnames(rnaseqcnt) <- paste0("rna",c(paste0(rep("C",3),1:3), paste0(rep("R",3), 1:3)))
+colnames(rnaseqcnt) = paste0("rna", ifelse(grepl('lane1C',fabian_rnaseq), 'C','R'),1:3 )
 
 ## summarize counts per gene name 
 rnaseqcnt$gene_name <- gene2name$gene_name[match(sub("\\..+","",rownames(rnaseqcnt)),gene2name$gene_id)]
@@ -47,8 +47,8 @@ rnacnt <- rnaseqcnt%>%group_by(gene_name)%>%dplyr::summarize_all(sum)%>%column_t
 ## DESeq for RNA
 dds <- DESeqDataSetFromMatrix(countData = rnacnt,
                               colData = data.frame(row.names=colnames(rnacnt),
-                                                   replicate=rep(1:3,2),
-                                                   condition=c(rep("C",3), rep("R",3))),
+                                                   replicate=sub("rna[CR]","",colnames(rnacnt)),
+                                                   condition= sub('rna([A-Z])[0-9]','\\1',colnames(rnacnt))),
                               design=~condition)
 dds$condition <- relevel(dds$condition, ref = "C")
 dds <- DESeq(dds)
@@ -106,8 +106,8 @@ colnames(cnt)[1:6]<-paste0(ifelse(grepl("RMD",colnames(ccnt)),"clipR","clipC"),1
 ddsIA <- DESeqDataSetFromMatrix(
   countData = cnt,
   colData=data.frame(row.names = colnames(cnt),
-                     group=c(rep("clip",6),rep("rna",6)),
-                     condition=ifelse(grepl("C",colnames(cnt)),"Ctrl","RMD")),
+                     group=colnames(cnt) %>% sub("[CR][0-9]+","",.),
+                     condition= ifelse(grepl("C",colnames(cnt), ignore.case = FALSE),"Ctrl","RMD") ),
   design = ~ group + condition + group:condition) 
 ## choose reference levels: Ctrl and RNAseq
 ddsIA$condition <- relevel(ddsIA$condition, ref = "Ctrl")
