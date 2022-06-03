@@ -52,7 +52,7 @@ if(!(file.exists(hg19))){
 if(!file.exists(file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))){
   message("Downloading Gencode 19 annotation...")
   system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
-  file.rename(from="gencode.v19.annotation.gtf.gz", to=file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))
+  file.rename(from="gencode.v19.annotation.gtf.gz", to=file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))}
 gtf <- rtracklayer::import(con = file.path(ann_dir,"gencode.v19.annotation.gtf.gz"))
 canonical_chr <- paste0("chr",c(1:22,"X","Y","M"))
 ## gene2name
