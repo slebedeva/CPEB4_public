@@ -130,13 +130,13 @@ hg19=config$genome
 load(file.path(ann_dir,"myregions.RData"))
 
 ## merged CLIP peaks
-load(file.path(datadir,"bed_reduced.RData")) ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
+load(file.path(resultdir,"bed_reduced.RData")) ## these peaks are reduced (overlapping peak calls are merged) and have regions assigned and DE count
 
 ## import target genes
-load(file.path(datadir,"target_genes.RData"))
+load(file.path(resultdir,"target_genes.RData"))
 
 ## differential expression
-load(file.path(datadir,"DEseq.RData")) 
+load(file.path(resultdir,"DEseq.RData")) 
 
 
 ## bam file list
