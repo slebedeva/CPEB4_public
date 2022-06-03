@@ -1126,23 +1126,11 @@ DEtrack1 <- DataTrack(range = file.path(datadir,"bigwigs","CPEB4_CLIP_r1_CLIP_4S
                       ,col.histogram = "darkblue"
                       ,fill.histogram = "darkblue")
 
-#DEtrack2 <- DataTrack(range = file.path(datadir,"bigwigs","Ctrl1_CLIP_DEs.plus.bw")
-#                      , genome = "hg19"
-#                      ,type="histogram"
-#                      ,name = "DEs"
-#                      ,col.histogram = "darkblue"
-#                      ,fill.histogram = "darkblue")
 
-covTrack1=DataTrack(range="data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw"
+covTrack1=DataTrack(range=file.path(datadir,"/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
                     , genome = "hg19"
                     ,type="s"
                     ,name = "coverage")
-
-#covTrack2=DataTrack(range=allbams[3]
-#                    , genome = "hg19"
-#                    ,type="l"
-#                    #,window="auto"
-#                    ,name = "coverage p32")
 
 
 ## overlay conversions and coverage (the scale is not the same!!!)
