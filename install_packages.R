@@ -74,9 +74,14 @@ if(is.null(config$Rlibdir)){
 }
 
 ## create R profile file too
-
+message('creating CPEB4.Rprofile...')
 Rprofile="CPEB4.Rprofile"
 if(!file.exists(Rprofile)){
 	   file.create(Rprofile)
 	   writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=Rprofile)
 	   }
+
+message('importing fonts...')
+extrafont::font_import(prompt=F)
+
+message('...all done!')
