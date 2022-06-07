@@ -861,37 +861,47 @@ c_cols=colnames(logCnt)%>%.[!grepl("RMD",.)]
 c_lbl=c_cols%>%sub("_.+","",.)%>%sub("CPEB4","p32",.)%>%sub("Ctrl","ir",.)
 r_cols=colnames(logCnt)%>%.[grepl("RMD",.)]
 r_lbl=r_cols%>%sub("_.+","",.)%>%sub("CPEB4","p32",.)%>%sub("RMD","ir",.)
-plot.new()
+## Recordplot does not work for non-interactive
+#plot.new()
+pdf(file=file.path(plotdir,'Fig_S5D_A.pdf'))
 pairs(logCnt%>%.[,c_cols], lower.panel = panel.smooth, upper.panel = panel.cor,
       gap=0, row1attop=FALSE, labels = c_lbl)
-p_repr_c <- recordPlot()
-plot.new()
+#p_repr_c <- recordPlot()
+dev.off()
+#plot.new()
+pdf(file=file.path(plotdir,'Fig_S5D_B.pdf'))
 pairs(logCnt%>%.[,r_cols], lower.panel = panel.smooth, upper.panel = panel.cor,
       gap=0, row1attop=FALSE, labels = r_lbl)
-p_repr_r <- recordPlot() 
+#p_repr_r <- recordPlot() 
+dev.off()
 
 write.csv(as.data.frame(logCnt), file = file.path(resultdir, "source_data/Fig_S5D.csv"))
 
-save_plot(file.path(plotdir,"Fig_S5D.pdf"),plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
+#save_plot(file.path(plotdir,"Fig_S5D.pdf"),plot_grid(p_repr_c,p_repr_r,ncol=1,scale=.7),base_height = 10, base_width = 6)
 
 ########### S5E: TC conversions and mutations barplots ################
 
 ## sum diagnostic events: how many T.C and T.deletion compared to other mutations (use txt file from omniCLIP)
-plot.new()
+#plot.new()
+pdf(file=file.path(plotdir,'Fig_S5E_A.pdf'))
 barplot(colSums(ctrl[,8:27]),main="DMSO",las=2)
-pTC1 <- recordPlot() ## to save plot in an object
-plot.new()
-barplot(colSums(rmd[,8:27]),main="RMD",las=2)
-pTC2 <- recordPlot()
-plot.new()
+#pTC1 <- recordPlot() ## to save plot in an object
+#plot.new()
+dev.off()
 
-TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.8)
+pdf(file=file.path(plotdir,'Fig_S5E_B.pdf'))
+barplot(colSums(rmd[,8:27]),main="RMD",las=2)
+#pTC2 <- recordPlot()
+#plot.new()
+dev.off()
+
+#TCpl=plot_grid(pTC1,pTC2,labels = "AUTO", scale=.8)
 
 write.csv(data.frame(DMSO=colSums(ctrl[,8:27]),RMD=colSums(rmd[,8:27])), file=file.path(resultdir, "source_data/Fig_S5E.csv"))
 
-save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl
-          , base_height = 6, base_width = 10
-          )
+#save_plot(file.path(plotdir,"Fig_S5E.pdf"),TCpl
+#          , base_height = 6, base_width = 10
+#          )
 
 ############# S5F: full transcript categories barplot ###########
 
@@ -1091,7 +1101,7 @@ options(ucscChromosomeNames=FALSE)
 
 ## sequence track - will see T-to-C conversions
 #library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
-sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
+sTrack <- SequenceTrack(Hsapiens)#,fontfamily="Arial",fontfamily.title="Arial")
 
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
@@ -1107,13 +1117,13 @@ sTrack <- SequenceTrack(Hsapiens,fontfamily="Arial",fontfamily.title="Arial")
 
 ## CLIP coverage from bam
 cliptrack1 <- AlignmentsTrack(allbams[1], isPaired = F, name = "CLIP r1 p32"
-                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, fontfamily="Arial",fontfamily.title="Arial"
                               #, referenceSequence=sTrack
                               ,type="coverage"
                               ,col.deletion="darkred"
 )
 cliptrack2 <- AlignmentsTrack(allbams[3], isPaired = F, name = "CLIP r3 ir"
-                              , fontfamily="Arial",fontfamily.title="Arial"
+                              #, fontfamily="Arial",fontfamily.title="Arial"
                               #, referenceSequence=sTrack
                               ,type="coverage"
 )
@@ -1153,9 +1163,9 @@ smgrtrack <- GeneRegionTrack(
   smTxdb
   , fill="darkblue"
   , collapseTranscripts="longest" ## show "meta" transcript to save space
-  ,fontfamily = myfont 
-  ,fontfamily.group = myfont 
-  ,fontfamily.title = myfont 
+#  ,fontfamily = myfont 
+#  ,fontfamily.group = myfont 
+#  ,fontfamily.title = myfont 
 )
 
 
