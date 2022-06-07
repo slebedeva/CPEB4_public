@@ -81,7 +81,7 @@ if(!file.exists(Rprofile)){
 	   writeLines(text=paste0(".libPaths(\'",libdir,"\')"), con=Rprofile)
 	   }
 
-message('importing fonts...')
-extrafont::font_import(prompt=F)
+#message('importing fonts...')
+#extrafont::font_import(prompt=F)
 
 message('...all done!')
