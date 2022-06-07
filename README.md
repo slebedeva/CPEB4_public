@@ -3,21 +3,21 @@
 Code for CLIP data analysis for the CPEB4 manuscript.
 
 
-## If you would like to reproduce figures from the processed data
+### If you would like to reproduce figures from the processed data
 
-0. Look into config.yml. It should work with default values. However if you have, for example, the hg19 genome you can change the path to it to shorten the runtime and to avoid downloading it again. You can also specify custom paths to the plots and results folders. Default paths are relative to the directory where manuscript_figures.R is.
+First, look into config.yml. It should work with default values. However if you have, for example, the hg19 genome you can change the path to it to shorten the runtime and to avoid downloading it again. You can also specify custom paths to the plots and results folders. Default paths are relative to the directory where manuscript_figures.R is.
 
-1. Get the R container and install relevant packages (if you do not have R installation).
+Next, get the R container and install relevant packages (if you do not have an R installation already).
 
 Presuming that you have no root access and are on linux:
 
-A. [Install miniconda3](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html): follow the instructions for your system.
+1. [Install miniconda3](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html): follow the instructions for your system.
 
 You will need to [download](https://docs.conda.io/en/latest/miniconda.html#linux-installers) and run a bash installation script.
 
 `bash Miniconda3-latest-Linux-x86_64.sh`
 
-B. Install singularity in a conda environment
+2. Install singularity in a conda environment and activate it
 
 ```
 eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
@@ -25,17 +25,19 @@ conda create --name singularity singularity=3.7.1
 conda activate singularity
 ```
 
-C. Pull the latest R bioconductor container
+Next steps are done within singularity conda environment:
+
+3. Pull the latest R bioconductor container
 
 `singularity pull bioc.sif docker://bioconductor/bioconductor_docker:devel`
 
-D. Install the necessary packages 
+4. Install the necessary packages 
 
-singularity exec bioc.sif Rscript install_packages.R
+`singularity exec bioc.sif Rscript install_packages.R`
+ 
+5. Run the script to produce figures 
 
-E. Run the script to produce figures 
-
-(It requires memory and time to run. If it crashes, just run it again until it finishes).
+(It requires memory and time to run.)
 
 `singularity exec bioc.sif Rscript manuscript_figures.R`
 
@@ -47,7 +49,7 @@ Contains the data encessary to run main R scripts, including bam and bed files o
 
 ### Directory scripts:
 
-Auxiliary R scripts (should be called from within manuscript_figures.R).
+Auxiliary R scripts (they should be called from within manuscript_figures.R).
 
 ### Main directory: 
 
