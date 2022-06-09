@@ -1089,11 +1089,11 @@ write.csv(ieg_table, file=file.path(resultdir,"table_s10_iegs.csv"))
 
 message("plotting gviz screenshots... can crash!")
 
-## need font otherwise error saving figure
-loadfonts(device = "postscript")
-par(family="Arial")
-ps.options(family="Arial")
-myfont="Arial"
+# ## need font otherwise error saving figure
+# loadfonts(device = "postscript")
+# par(family="Arial")
+# ps.options(family="Arial")
+# myfont="Arial"
 
 
 #library(Gviz)
@@ -1101,7 +1101,7 @@ options(ucscChromosomeNames=FALSE)
 
 ## sequence track - will see T-to-C conversions
 #library(BSgenome.Hsapiens.UCSC.hg19) ## to get sequence
-sTrack <- SequenceTrack(Hsapiens)#,fontfamily="Arial",fontfamily.title="Arial")
+sTrack <- SequenceTrack(Hsapiens,fontsize=12)#,fontfamily="Arial",fontfamily.title="Arial")
 
 ## gene region track
 ## gencode has too many transcripts for plotting, use meta-transcript feature
@@ -1213,36 +1213,44 @@ save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
 
 
 ## make new zoomed in coordinates
-mywindow=100
+## luckily all on plus strand so no need to think!
+mywindow1=80
+mywindow2=40
 
 for(mygene in goi){
   ## get highest scoring cluster
   myclus=subset(ctrl2, gene_names%in%mygene) %>% .[order(-.$score)] %>% .[1]
   #chr=seqnames(myclus)@values
   ## plot not cluster borders, but a window around crosslink
-  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow
-  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow
+  mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow1
+  mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow2
   ## get all coordinates to fill in 0 coverage
   #gr=GRanges(seqnames = rep(mygenes$chr, each=mywindow), ranges = IRanges(start = mygenes$afrom2:mygenes$ato2,width=1))
+  mygenes[mygene,"seq"]=as.character(getSeq(FaFile(hg19),GRanges(seqnames = mygenes[mygene,"chr"], ranges = IRanges(start = mygenes[mygene,"afrom2"],end=mygenes[mygene,"ato2"]))))
 }
 
 
+## get the positions of A motifs
+## locate A-rich
+mygenes=cbind(mygenes,stringr::str_locate_all(pattern = 'AAACAAA|AAAAAAAAAA|AATAAA',mygenes$seq) %>% do.call(rbind,.))
+##make track
+gr=with(mygenes,
+        GRanges(seqnames=chr, ranges=IRanges(start=afrom2+start-1,end=afrom2+end-1))
+)
+atrack <- AnnotationTrack(gr, name = "", alpha=1, genome = 'hg19', fill='darkred', col.line=alpha('darkred',0), col='darkred')
+
 ## because coverage of 0 does not show try to do it by hand from bigwig
-cv=rtracklayer::import("data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
-
-## some granges arithmetic
-gr=GRanges(seqnames = mygenes$chr, ranges = IRanges(start=mygenes$afrom2
-                                                    ,end=mygenes$ato2))
-## substract those intervals from bw which have score
-gr1=subsetByOverlaps(cv,gr)
-## find the difference and add to the ones before
-dif=plyranges::setdiff_ranges(gr,gr1)
-dif$score=0
-newgr=sort(c(dif,gr1))
-
-
-newcovTrack=DataTrack(range = newgr, type="S")
-
+#cv=rtracklayer::import("data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
+# ## some granges arithmetic
+# gr=GRanges(seqnames = mygenes$chr, ranges = IRanges(start=mygenes$afrom2
+#                                                     ,end=mygenes$ato2))
+# ## substract those intervals from bw which have score
+# gr1=subsetByOverlaps(cv,gr)
+# ## find the difference and add to the ones before
+# dif=plyranges::setdiff_ranges(gr,gr1)
+# dif$score=0
+# newgr=sort(c(dif,gr1))
+# newcovTrack=DataTrack(range = newgr, type="S")
 
 igvs2 <- 
   xyplot(1 ~ gene | gene, data = mygenes,
@@ -1261,10 +1269,11 @@ igvs2 <-
              #,covTrack1
              , smgrtrack
              , sTrack
+             , atrack
            ),from = afrom,to = ato,chromosome = chr
            ,ylim=c(0,ylim)
            #,type="coverage"
-           ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(3,.1,.1),
+           ,showId = F, geneSymbol=F,cex = 0.4, sizes = c(3,.2,.2,.2),
            main = paste0(chr,":",afrom,"-",ato), cex.main=1, col.main = "grey30",background.title="transparent",col.title="grey30",col.axis="grey30",add=T)
          }
          , layout=c(1,3)
@@ -1277,9 +1286,9 @@ fig_5g_suppl=plot_grid(igvs2)
 
 #fig_5g_suppl
 
-save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 15,  fig_5g_suppl)
+save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 11,  fig_5g_suppl)
 
-
+## to keep sequence track shown as letters and not bars, export pdf as 7x8in by hand from the plotting window
 
 
 
