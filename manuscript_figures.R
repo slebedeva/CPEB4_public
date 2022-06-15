@@ -443,6 +443,8 @@ save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
 ## take top 100 crosslink centers only in 3UTR
 top100c=myxlc %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(100) ## strictly 3'UTR sites
 
+## they are all in each different gene so I can boldly say they are top 100 "genes"
+
 #get their sequence, because peak length is too variable, we rather get window around XL center again
 ## take window of 51 so that xl site is in the middle
 mywindow=51
@@ -536,8 +538,8 @@ suppressWarnings(
   )+ 
   theme(axis.text.y = element_text(size=6))+
   geom_vline(xintercept = c(25,26))+
-  labs(x="nucleotide",y="gene"
-       , title="kmer positions of top 100 genes in 3'UTRs"
+  labs(x="nucleotide",y="CPEB4 binding site"
+       , title="6-mer positions of top 100 sites in 3'UTRs"
        , fill="6-mers"
   )+
   scale_fill_manual(values = c("darkred","darkcyan"
@@ -552,7 +554,7 @@ suppressWarnings(
 
 #write.csv()
 save_plot(file.path(plotdir,"Fig_SXX_4E.pdf"),base_asp = 0.618, base_height = 7, top100pl)
-
+## to make png in bash: pdftoppm -png -r 300 Fig_SXX_5G.pdf Fig_SXX_5G
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 

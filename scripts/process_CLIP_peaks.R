@@ -238,8 +238,7 @@ rmd2$target_group <- Hmisc::cut2(rmd2$sumDE,  cuts = mycuts)%>%gsub("\\[| ","",.
 message("Preparing bed files...")
 ctrl2$score <- ctrl2$sumDE
 ctrl2$score[is.na(ctrl2$score)]<-0
-ctrl2$name2 <- ctrl2$name
-ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
+ctrl2$name2 <- paste(ctrl2$name,ctrl2$condition,sep="@")
 
 ## for fair comparison of revision, keep thick as before (max)
 #ctrl2$thick <- IRanges(start=ifelse(!is.na(ctrl2$thickTCMax),ctrl2$thickTCMax,
@@ -255,8 +254,7 @@ ctrl2$name <- paste(ctrl2$name,ctrl2$condition,sep="@")
 #                                     ,width=1)
 rmd2$score <- rmd2$sumDE
 rmd2$score[is.na(rmd2$score)]<-0
-rmd2$name2 <- rmd2$name
-rmd2$name <- paste(rmd2$name,rmd2$condition,sep="@")
+rmd2$name2 <- paste(rmd2$name,rmd2$condition,sep="@")
 ### old way
 #rmd2$thick <- IRanges(start=ifelse(!is.na(rmd2$thickTCMax),rmd2$thickTCMax,
 #                                   ifelse(!is.na(rmd2$thickTDMax),rmd2$thickTDMax,
