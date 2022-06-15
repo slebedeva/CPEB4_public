@@ -438,12 +438,10 @@ write.csv(cbind(as.data.frame(kmersr$km_matrix%>%t()),kmr$cluster), file=file.pa
 save_plot(file.path(plotdir,"Fig_S6B.pdf"),fullheatr)
 
 
-##################### related to 4E: examples of motifs for top 100 genes #######################
+##################### Figure S7 related to 4E: examples of motifs for top 100 sites #######################
 
 ## take top 100 crosslink centers only in 3UTR
 top100c=myxlc %>% .[.$region=="3'UTR"] %>% .[order(-.$score)] %>% head(100) ## strictly 3'UTR sites
-
-## they are all in each different gene so I can boldly say they are top 100 "genes"
 
 #get their sequence, because peak length is too variable, we rather get window around XL center again
 ## take window of 51 so that xl site is in the middle
@@ -553,8 +551,8 @@ suppressWarnings(
 )
 
 #write.csv()
-save_plot(file.path(plotdir,"Fig_SXX_4E.pdf"),base_asp = 0.618, base_height = 7, top100pl)
-## to make png in bash: pdftoppm -png -r 300 Fig_SXX_5G.pdf Fig_SXX_5G
+save_plot(file.path(plotdir,"Fig_S7.pdf"),base_asp = 0.618, base_height = 7, top100pl)
+## to make png in bash: pdftoppm -png -r 300 Fig_S7.pdf Fig_S7
 
 ################# 4C: site density metaplots over 3'UTR (RCAS package) ##################################
 
@@ -708,7 +706,7 @@ fab_half <- hlraw%>%
 
 ### source data
 
-write_csv(fab_half, file=file.path(resultdir,"source_data/Fig_5DE_S7C.csv"))
+write_csv(fab_half, file=file.path(resultdir,"source_data/Fig_5DE_S8C.csv"))
 
 
 ##################### 5A: violin plots for half-lives ###################
@@ -967,9 +965,9 @@ write_csv(m1, file=file.path(resultdir, "source_data/Fig_S6A.csv"))
 save_plot(file.path(plotdir,"Fig_S6A.pdf"),ggscat)
 
 
-########### Fig S7 ##########
+########### Fig S8 ##########
 
-############## S7B: boxplot for half-lives DMSO and RMD ####################
+############## S8B: boxplot for half-lives DMSO and RMD ####################
 
 ## boxplot from Fabian 
 ## select necessary columns and melt
@@ -1021,11 +1019,11 @@ bpstar <-
 
 bpstar
 
-write_csv(hl4, file = file.path(resultdir, "source_data/Fig_S7B.csv"))
+write_csv(hl4, file = file.path(resultdir, "source_data/Fig_S8B.csv"))
 
-save_plot(file.path(plotdir,"Fig_S7B.pdf"),bpstar)
+save_plot(file.path(plotdir,"Fig_S8B.pdf"),bpstar)
 
-################### S7C: ecdf for ARE #########################
+################### S8C: ecdf for ARE #########################
 
 ## run code for Fig 5 (preface) first
 ggsiARE <- 
@@ -1039,7 +1037,7 @@ ggsiARE <-
                      labels=summary(factor(fab_half$ARE))%>%paste(names(.),.,sep=": n=")) +
   NULL
 ggsiARE
-save_plot(file.path(plotdir,"Fig_S7C.pdf"),ggsiARE)
+save_plot(file.path(plotdir,"Fig_S8C.pdf"),ggsiARE)
 
 ######################### final gene target tables suppl file S7,S10 ###########################
 
@@ -1211,11 +1209,11 @@ save_plot(file.path(plotdir,"Fig_5G.pdf"),fig5g)
 
 
 
-### new panel to zoom in
+####### Fig S9: new panel to zoom in ######
 
 
 ## make new zoomed in coordinates
-## luckily all on plus strand so no need to think!
+## luckily all on plus strand so no need to reverse windows
 mywindow1=80
 mywindow2=40
 
@@ -1226,8 +1224,6 @@ for(mygene in goi){
   ## plot not cluster borders, but a window around crosslink
   mygenes[mygene,"afrom2"]=start(myclus$thick)-mywindow1
   mygenes[mygene,"ato2"]=start(myclus$thick)+mywindow2
-  ## get all coordinates to fill in 0 coverage
-  #gr=GRanges(seqnames = rep(mygenes$chr, each=mywindow), ranges = IRanges(start = mygenes$afrom2:mygenes$ato2,width=1))
   mygenes[mygene,"seq"]=as.character(getSeq(FaFile(hg19),GRanges(seqnames = mygenes[mygene,"chr"], ranges = IRanges(start = mygenes[mygene,"afrom2"],end=mygenes[mygene,"ato2"]))))
 }
 
@@ -1241,18 +1237,6 @@ gr=with(mygenes,
 )
 atrack <- AnnotationTrack(gr, name = "", alpha=1, genome = 'hg19', fill='darkred', col.line=alpha('darkred',0), col='darkred')
 
-## because coverage of 0 does not show try to do it by hand from bigwig
-#cv=rtracklayer::import("data/bigwigs/CPEB4_CLIP_r1_CLIP_4SU_DMSO_fwd.bw")
-# ## some granges arithmetic
-# gr=GRanges(seqnames = mygenes$chr, ranges = IRanges(start=mygenes$afrom2
-#                                                     ,end=mygenes$ato2))
-# ## substract those intervals from bw which have score
-# gr1=subsetByOverlaps(cv,gr)
-# ## find the difference and add to the ones before
-# dif=plyranges::setdiff_ranges(gr,gr1)
-# dif$score=0
-# newgr=sort(c(dif,gr1))
-# newcovTrack=DataTrack(range = newgr, type="S")
 
 igvs2 <- 
   xyplot(1 ~ gene | gene, data = mygenes,
@@ -1262,13 +1246,7 @@ igvs2 <-
            chr=mygenes$chr[x]
            ylim=mygenes$ylims[x]
            plotTracks(c(
-             #ot1 
              ot2
-             #newcovTrack
-             #,cliptrack1
-             #,cliptrack2,
-             #,DEtrack1
-             #,covTrack1
              , smgrtrack
              , sTrack
              , atrack
@@ -1288,7 +1266,7 @@ fig_5g_suppl=plot_grid(igvs2)
 
 #fig_5g_suppl
 
-save_plot(file.path(plotdir,"Fig_SXX_5G.pdf"),base_asp = .8, base_height = 11,  fig_5g_suppl)
+save_plot(file.path(plotdir,"Fig_S9.pdf"),base_asp = .8, base_height = 11,  fig_5g_suppl)
 
 ## to keep sequence track shown as letters and not bars, export pdf as 7x8in by hand from the plotting window
 
