@@ -68,3 +68,7 @@ Contains the pipelines used for mapping 1) p32 and 2) ir CPEB4 CLIP data as well
 ### Directory omniCLIP_scripts
 
 Contains the scripts used to run omniCLIP on CPEB4 data as well as multiple published HeLa CLIP data. The omniCLIP version used for this, as well as scripts to generate the database are in this [omniCLIP fork](https://github.com/slebedeva/omniCLIP). The general pipeline to map any CLIP data is in [this repository](https://github.com/slebedeva/CLIP_mapping).
+
+---
+
+Detailed wet lab protocol for infrared PAR-CLIP can be found [here](https://www.protocols.io/view/infrared-par-clip-261ge4yxyv47/v1).
