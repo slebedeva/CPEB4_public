@@ -1,6 +1,6 @@
 # CPEB4_public
 
-Code for CLIP data analysis for the CPEB4 manuscript.
+Code for CLIP data analysis for the paper [Control of immediate early gene expression by CPEB4-repressor complex-mediated mRNA degradation](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02760-5) by Poetz, Lebedeva et al., Genome Biology, 2022
 
 
 ### If you would like to reproduce figures from the processed data
